@@ -29,7 +29,7 @@
     <string name="EventType">Set di icone barra laterale</string>
     <string name="ChristmasHat">Mostra il cappello di Natale ogni giorno</string>
     <string name="ActionBarDecoration">Decorazione barra del titolo</string>
-    <string name="DependsOnDate">A seconda della data</string>
+    <string name="DependsOnDate">Dipende dalla data</string>
     <string name="Christmas">Natale</string>
     <string name="Valentine">San Valentino</string>
     <string name="Snowflakes">Fiocchi di neve</string>
@@ -69,11 +69,11 @@
     <string name="UnlimitedPinnedDialogsAbout">Fissa chat illimitate disattivando la loro sincronizzazione.</string>
     <string name="OpenArchiveOnPull">Apri l\'archivio tirando giù</string>
     <string name="HideKeyboardOnChatScroll">Nascondi la tastiera quando scorri la chat</string>
-    <string name="UserRestrictionsSendStickers2">Inviare sticker</string>
+    <string name="UserRestrictionsSendStickers2">Inviare stickers</string>
     <string name="UserRestrictionsSendGifs">Inviare GIF</string>
-    <string name="ShowTabsOnForward">Mostra le tab durante l\'inoltro</string>
+    <string name="ShowTabsOnForward">Mostra cartelle durante l\'inoltro</string>
     <string name="CheckAllAdministrated">Aggiungi amministrate</string>
-    <string name="RearVideoMessages">Usa fotocamera posteriore in Video Messaggi</string>
+    <string name="RearVideoMessages">Usa fotocamera posteriore nei Video Messaggi</string>
     <string name="HideAllTab">Nascondi la scheda \"Tutte le chat\"</string>
     <string name="HideAllTabAbout">Premi \"Indietro\" sulla home page per aprirlo.</string>
     <string name="TabTitleType">Mostra sulle schede</string>
@@ -140,4 +140,8 @@
     <string name="AvatarAsBackground">Immagine del profilo come background</string>
     <string name="BlurAvatarBackground">Immagine del profilo sfocata</string>
     <string name="DarkenAvatarBackground">Immagine del profilo scurita</string>
+    <string name="SilenceNonContacts">Silenzia non-contatti</string>
+    <string name="SilenceNonContactsAbout">Le notifiche da parte di persone che non sono tuoi contatti appariranno senza suono. È possibile aggiungere gli utenti ai contatti dal loro profilo senza conoscere il loro numero di telefono.</string>
+    <string name="SelectBetween">Seleziona tra</string>
+    <string name="SwipeToPiP">Scorri verso l\'alto il video per la modalità PiP</string>
 </resources>
