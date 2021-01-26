@@ -35,6 +35,6 @@ Nekogram派生于Telegram,因此我们遵循了[Telegram的本地化规则](http
 
 该项目遵守[all-contributors](https://github.com/kentcdodds/all-contributors)规范,我们欢迎每一个人为此作出贡献!
 
-#License
+# License
 
 Apply [Artistic License 2.0]()https://choosealicense.com/licenses/artistic-2.0 under the premise of complying with [GNU GPLv2](https://choosealicense.com/licenses/gpl-2.0).
