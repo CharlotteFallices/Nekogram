@@ -6,7 +6,7 @@ Nekogram是一只非官方的Telegram客户端.
 您可以在[Google play store](https://play.google.com/store/apps/details?id=tw.nekomimi.nekogram)或[官方群组](https://t.me/NekogramAPKs)中获取应用.
 您可以通过[这里](https://t.me/zuragram)获取更新消息,并在[这里](https://gitlab.com/Nekogram/Nekogram/-/issues)向我们反馈您的意见.
 
-## API,Protocol documentation
+## Document
 
 请参阅[Telegram API帮助文档](https://core.telegram.org/api)与[MTproto的帮助文档](https://core.telegram.org/mtproto).
 
