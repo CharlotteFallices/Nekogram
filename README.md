@@ -38,3 +38,4 @@ Nekogram派生于Telegram,因此我们遵循了[Telegram的本地化规则](http
 # License
 
 Apply [Artistic License 2.0](https://choosealicense.com/licenses/artistic-2.0) under the premise of complying with [GNU GPLv2](https://choosealicense.com/licenses/gpl-2.0).
+The Artistic License is based on GPL License and it requires that modified versions of the software **do not prevent** users from running the [standard version](gitlab.com/Nekogram/Nekogram).
