@@ -24,8 +24,7 @@ import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Cells.ChatMessageCell;
 import org.telegram.ui.Components.BackgroundGradientDrawable;
 import org.telegram.ui.Components.LayoutHelper;
-
-import tw.nekomimi.nekogram.NekoConfig;
+import org.telegram.ui.Components.MotionBackgroundDrawable;
 
 @SuppressLint("ViewConstructor")
 public class StickerSizePreviewMessagesCell extends LinearLayout {
@@ -67,7 +66,7 @@ public class StickerSizePreviewMessagesCell extends LinearLayout {
         message.media.document.access_hash = 0;
         message.media.document.date = date;
         TLRPC.TL_documentAttributeSticker attributeSticker = new TLRPC.TL_documentAttributeSticker();
-        attributeSticker.alt = "🐱";
+        attributeSticker.alt = "🐈‍⬛";
         message.media.document.attributes.add(attributeSticker);
         TLRPC.TL_documentAttributeImageSize attributeImageSize = new TLRPC.TL_documentAttributeImageSize();
         attributeImageSize.h = 512;
@@ -90,12 +89,11 @@ public class StickerSizePreviewMessagesCell extends LinearLayout {
         message.out = false;
         message.peer_id = new TLRPC.TL_peerUser();
         message.peer_id.user_id = 1;
-        messageObjects[0].customReplyName = LocaleController.getString("StickerSizeDialogName", R.string.StickerSizeDialogName);
+        messageObjects[0].customReplyName = "FiveYellowMice";
         messageObjects[0].replyMessageObject = new MessageObject(UserConfig.selectedAccount, message, true, false);
 
-
         message = new TLRPC.TL_message();
-        message.message = NekoConfig.stickerSize < 9 ? LocaleController.getString("StickerSizeDialogMessageSmallOne", R.string.StickerSizeDialogMessageSmallOne) : LocaleController.getString("StickerSizeDialogMessageBigOne", R.string.StickerSizeDialogMessageBigOne);
+        message.message = LocaleController.getString("StickerSizeDialogMessage", R.string.StickerSizeDialogMessage);
         message.date = date + 1270;
         message.dialog_id = -1;
         message.flags = 259;
@@ -124,11 +122,6 @@ public class StickerSizePreviewMessagesCell extends LinearLayout {
     public void invalidate() {
         super.invalidate();
         for (int a = 0; a < cells.length; a++) {
-            if (a == 1) {
-                messageObjects[a].messageOwner.message = NekoConfig.stickerSize < 9 ? LocaleController.getString("StickerSizeDialogMessageSmallOne", R.string.StickerSizeDialogMessageSmallOne) : LocaleController.getString("StickerSizeDialogMessageBigOne", R.string.StickerSizeDialogMessageBigOne);
-                messageObjects[a].applyNewText();
-                messageObjects[a].resetLayout();
-            }
             cells[a].setMessageObject(messageObjects[a], null, false, false);
             cells[a].invalidate();
         }
@@ -158,7 +151,7 @@ public class StickerSizePreviewMessagesCell extends LinearLayout {
             } else {
                 drawable.setAlpha(255);
             }
-            if (drawable instanceof ColorDrawable || drawable instanceof GradientDrawable) {
+            if (drawable instanceof ColorDrawable || drawable instanceof GradientDrawable || drawable instanceof MotionBackgroundDrawable) {
                 drawable.setBounds(0, 0, getMeasuredWidth(), getMeasuredHeight());
                 if (drawable instanceof BackgroundGradientDrawable) {
                     final BackgroundGradientDrawable backgroundGradientDrawable = (BackgroundGradientDrawable) drawable;

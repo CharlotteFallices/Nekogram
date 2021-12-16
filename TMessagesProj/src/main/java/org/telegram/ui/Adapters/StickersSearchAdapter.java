@@ -155,28 +155,25 @@ public class StickersSearchAdapter extends RecyclerListView.SelectionAdapter {
                     MediaDataController.getInstance(currentAccount).fetchNewEmojiKeywords(newLanguage);
                 }
                 delegate.setLastSearchKeyboardLanguage(newLanguage);
-                MediaDataController.getInstance(currentAccount).getEmojiSuggestions(delegate.getLastSearchKeyboardLanguage(), searchQuery, false, new MediaDataController.KeywordResultCallback() {
-                    @Override
-                    public void run(ArrayList<MediaDataController.KeywordResult> param, String alias) {
-                        if (lastId != emojiSearchId) {
-                            return;
-                        }
-                        boolean added = false;
-                        for (int a = 0, size = param.size(); a < size; a++) {
-                            String emoji = param.get(a).emoji;
-                            ArrayList<TLRPC.Document> newStickers = allStickers != null ? allStickers.get(emoji) : null;
-                            if (newStickers != null && !newStickers.isEmpty()) {
-                                clear();
-                                if (!emojiStickers.containsKey(newStickers)) {
-                                    emojiStickers.put(newStickers, emoji);
-                                    emojiArrays.add(newStickers);
-                                    added = true;
-                                }
+                MediaDataController.getInstance(currentAccount).getEmojiSuggestions(delegate.getLastSearchKeyboardLanguage(), searchQuery, false, (param, alias) -> {
+                    if (lastId != emojiSearchId) {
+                        return;
+                    }
+                    boolean added = false;
+                    for (int a = 0, size = param.size(); a < size; a++) {
+                        String emoji = param.get(a).emoji;
+                        ArrayList<TLRPC.Document> newStickers = allStickers != null ? allStickers.get(emoji) : null;
+                        if (newStickers != null && !newStickers.isEmpty()) {
+                            clear();
+                            if (!emojiStickers.containsKey(newStickers)) {
+                                emojiStickers.put(newStickers, emoji);
+                                emojiArrays.add(newStickers);
+                                added = true;
                             }
                         }
-                        if (added) {
-                            notifyDataSetChanged();
-                        }
+                    }
+                    if (added) {
+                        notifyDataSetChanged();
                     }
                 });
             }
@@ -268,13 +265,15 @@ public class StickersSearchAdapter extends RecyclerListView.SelectionAdapter {
             notifyDataSetChanged();
         }
     };
+    private final Theme.ResourcesProvider resourcesProvider;
 
-    public StickersSearchAdapter(Context context, Delegate delegate, TLRPC.StickerSetCovered[] primaryInstallingStickerSets, LongSparseArray<TLRPC.StickerSetCovered> installingStickerSets, LongSparseArray<TLRPC.StickerSetCovered> removingStickerSets) {
+    public StickersSearchAdapter(Context context, Delegate delegate, TLRPC.StickerSetCovered[] primaryInstallingStickerSets, LongSparseArray<TLRPC.StickerSetCovered> installingStickerSets, LongSparseArray<TLRPC.StickerSetCovered> removingStickerSets, Theme.ResourcesProvider resourcesProvider) {
         this.context = context;
         this.delegate = delegate;
         this.primaryInstallingStickerSets = primaryInstallingStickerSets;
         this.installingStickerSets = installingStickerSets;
         this.removingStickerSets = removingStickerSets;
+        this.resourcesProvider = resourcesProvider;
     }
 
     @Override
@@ -351,14 +350,14 @@ public class StickersSearchAdapter extends RecyclerListView.SelectionAdapter {
                 view = new EmptyCell(context);
                 break;
             case 2:
-                view = new StickerSetNameCell(context, false, true);
+                view = new StickerSetNameCell(context, false, true, resourcesProvider);
                 break;
             case 3:
-                view = new FeaturedStickerSetInfoCell(context, 17, true);
+                view = new FeaturedStickerSetInfoCell(context, 17, true, true, resourcesProvider);
                 ((FeaturedStickerSetInfoCell) view).setAddOnClickListener(v -> {
                     final FeaturedStickerSetInfoCell cell = (FeaturedStickerSetInfoCell) v.getParent();
                     TLRPC.StickerSetCovered pack = cell.getStickerSet();
-                    if (installingStickerSets.indexOfKey(pack.set.id) >= 0 || removingStickerSets.indexOfKey(pack.set.id) >= 0) {
+                    if (pack == null || installingStickerSets.indexOfKey(pack.set.id) >= 0 || removingStickerSets.indexOfKey(pack.set.id) >= 0) {
                         return;
                     }
                     if (cell.isInstalled()) {
@@ -380,7 +379,7 @@ public class StickersSearchAdapter extends RecyclerListView.SelectionAdapter {
                 emptyImageView = new ImageView(context);
                 emptyImageView.setScaleType(ImageView.ScaleType.CENTER);
                 emptyImageView.setImageResource(R.drawable.stickers_empty);
-                emptyImageView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_chat_emojiPanelEmptyText), PorterDuff.Mode.MULTIPLY));
+                emptyImageView.setColorFilter(new PorterDuffColorFilter(getThemedColor(Theme.key_chat_emojiPanelEmptyText), PorterDuff.Mode.MULTIPLY));
                 layout.addView(emptyImageView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
 
                 layout.addView(new Space(context), LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 15));
@@ -388,7 +387,7 @@ public class StickersSearchAdapter extends RecyclerListView.SelectionAdapter {
                 emptyTextView = new TextView(context);
                 emptyTextView.setText(LocaleController.getString("NoStickersFound", R.string.NoStickersFound));
                 emptyTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
-                emptyTextView.setTextColor(Theme.getColor(Theme.key_chat_emojiPanelEmptyText));
+                emptyTextView.setTextColor(getThemedColor(Theme.key_chat_emojiPanelEmptyText));
                 layout.addView(emptyTextView, LayoutHelper.createLinear(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT));
 
                 view = layout;
@@ -400,14 +399,13 @@ public class StickersSearchAdapter extends RecyclerListView.SelectionAdapter {
         return new RecyclerListView.Holder(view);
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
         switch (holder.getItemViewType()) {
             case 0: {
                 TLRPC.Document sticker = (TLRPC.Document) cache.get(position);
                 StickerEmojiCell cell = (StickerEmojiCell) holder.itemView;
-                cell.setSticker(sticker, cacheParent.get(position), positionToEmoji.get(position), false);
+                cell.setSticker(sticker, null, cacheParent.get(position), positionToEmoji.get(position), false);
                 //cell.setRecent(recentStickers.contains(sticker) || favouriteStickers.contains(sticker));
                 break;
             }
@@ -443,15 +441,16 @@ public class StickersSearchAdapter extends RecyclerListView.SelectionAdapter {
         }
     }
 
+    @SuppressWarnings("unchecked")
     @Override
     public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position, @NonNull List payloads) {
         if (payloads.contains(PAYLOAD_ANIMATED)) {
             if (holder.getItemViewType() == 3) {
                 bindFeaturedStickerSetInfoCell((FeaturedStickerSetInfoCell) holder.itemView, position, true);
+                return;
             }
-        } else {
-            super.onBindViewHolder(holder, position, payloads);
         }
+        super.onBindViewHolder(holder, position, payloads);
     }
 
     public void installStickerSet(TLRPC.InputStickerSet inputSet) {
@@ -545,7 +544,6 @@ public class StickersSearchAdapter extends RecyclerListView.SelectionAdapter {
                 installing = false;
             } else if (removing && !cell.isInstalled()) {
                 removingStickerSets.remove(stickerSetCovered.set.id);
-                removing = false;
             }
         }
         cell.setAddDrawProgress(!forceInstalled && installing, animated);
@@ -601,7 +599,7 @@ public class StickersSearchAdapter extends RecyclerListView.SelectionAdapter {
                         }
                     }
                     int count = (int) Math.ceil(documentsCount / (float) delegate.getStickersPerRow());
-                    for (int b = 0, N = count; b < N; b++) {
+                    for (int b = 0; b < count; b++) {
                         rowStartPack.put(startRow + b, documentsCount);
                     }
                     totalItems += count * delegate.getStickersPerRow();
@@ -675,5 +673,10 @@ public class StickersSearchAdapter extends RecyclerListView.SelectionAdapter {
         StickerSetNameCell.createThemeDescriptions(descriptions, listView, delegate);
         descriptions.add(new ThemeDescription(emptyImageView, ThemeDescription.FLAG_IMAGECOLOR, null, null, null, null, Theme.key_chat_emojiPanelEmptyText));
         descriptions.add(new ThemeDescription(emptyTextView, ThemeDescription.FLAG_TEXTCOLOR, null, null, null, null, Theme.key_chat_emojiPanelEmptyText));
+    }
+
+    private int getThemedColor(String key) {
+        Integer color = resourcesProvider != null ? resourcesProvider.getColor(key) : null;
+        return color != null ? color : Theme.getColor(key);
     }
 }

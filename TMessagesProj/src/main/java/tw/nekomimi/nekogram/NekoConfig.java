@@ -7,18 +7,30 @@ import android.content.SharedPreferences;
 import android.graphics.Typeface;
 import android.os.Build;
 
+import org.tcp2ws.tcp2wsServer;
+import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
+import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.NotificationsService;
+import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
+import org.telegram.tgnet.TLRPC;
+import org.telegram.ui.ActionBar.Theme;
 
 import java.io.BufferedReader;
 import java.io.FileReader;
+import java.net.ServerSocket;
+import java.util.Arrays;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import tw.nekomimi.nekogram.translator.DeepLTranslator;
+import tw.nekomimi.nekogram.translator.Translator;
+
 @SuppressLint("ApplySharedPref")
 public class NekoConfig {
+    //TODO: refactor
 
     public static final int TITLE_TYPE_TEXT = 0;
     public static final int TITLE_TYPE_ICON = 1;
@@ -29,6 +41,8 @@ public class NekoConfig {
     public static final int ID_TYPE_BOTAPI = 2;
 
     private static final String EMOJI_FONT_AOSP = "NotoColorEmoji.ttf";
+
+    private static final int[] OFFICIAL_CHANNELS = {1302242053, 1406090861, 1221673407, 1339737452, 1349472891};
 
     private static final Object sync = new Object();
     public static boolean useIPv6 = false;
@@ -45,10 +59,14 @@ public class NekoConfig {
     public static boolean confirmAVMessage = false;
     public static boolean askBeforeCall = true;
     public static boolean disableNumberRounding = false;
+    public static boolean disableGreetingSticker = false;
     public static float stickerSize = 14.0f;
-    public static int translationProvider = 1;
+    public static int translationProvider = Translator.PROVIDER_GOOGLE;
+    public static String translationTarget = "app";
+    public static int deepLFormality = DeepLTranslator.FORMALITY_DEFAULT;
     public static int tabsTitleType = TITLE_TYPE_TEXT;
     public static int idType = ID_TYPE_API;
+    public static int maxRecentStickers = 20;
 
     public static boolean showAddToSavedMessages = true;
     public static boolean showReport = false;
@@ -63,7 +81,6 @@ public class NekoConfig {
     public static boolean showNoQuoteForward = true;
 
     public static boolean hidePhone = true;
-    public static int typeface = Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP ? 1 : 0;
     public static boolean transparentStatusBar = false;
     public static boolean forceTablet = false;
     public static boolean openArchiveOnPull = false;
@@ -89,12 +106,20 @@ public class NekoConfig {
     public static boolean accentAsNotificationColor = false;
     public static boolean silenceNonContacts = false;
     public static boolean swipeToPiP = false;
+    public static boolean disableJumpToNextChannel = false;
+
+    public static final String WS_ADDRESS = "ws.neko";
+    private static int socksPort = -1;
+    private static boolean tcp2wsStarted = false;
+    private static tcp2wsServer tcp2wsServer;
+    public static boolean wsEnableTLS = true;
+    public static boolean wsUseMTP = false;
+    public static boolean wsUseDoH = true;
 
     public static boolean residentNotification = false;
 
     public static boolean shouldNOTTrustMe = false;
-
-    public static long lastSuccessfulCheckUpdateTime = 0;
+    public static boolean blockSponsoredMessage = false;
 
     public static boolean customEmojiFont;
     public static String customEmojiFontPath;
@@ -102,6 +127,7 @@ public class NekoConfig {
     private static Typeface systemEmojiTypeface;
     public static boolean loadSystemEmojiFailed = false;
 
+    public static boolean isChineseUser = false;
 
     private static boolean configLoaded;
 
@@ -109,85 +135,60 @@ public class NekoConfig {
         loadConfig();
     }
 
-    /*public static void saveConfig() {
-        synchronized (sync) {
+    public static int getSocksPort() {
+        if (tcp2wsStarted && socksPort != -1) {
+            return socksPort;
+        }
+        try {
+            ServerSocket socket = new ServerSocket(0);
+            socksPort = socket.getLocalPort();
+            socket.close();
+            if (!tcp2wsStarted) {
+                tcp2wsServer = new tcp2wsServer()
+                        .setTgaMode(false)
+                        .setTls(wsEnableTLS)
+                        .setIfMTP(wsUseMTP)
+                        .setIfDoH(wsUseDoH);
+                tcp2wsServer.start(socksPort);
+                tcp2wsStarted = true;
+            }
+            return socksPort;
+        } catch (Exception e) {
+            FileLog.e(e);
+            return -1;
+        }
+    }
+
+    public static void wsReloadConfig() {
+        if (tcp2wsServer != null) {
             try {
-                SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfing", Context.MODE_PRIVATE);
-                SharedPreferences.Editor editor = preferences.edit();
-                editor.putBoolean("useIPv6", useIPv6);
-                editor.putBoolean("hidePhone", hidePhone);
-                editor.putBoolean("ignoreBlocked", ignoreBlocked);
-                editor.putBoolean("forceTablet", forceTablet);
-                editor.putBoolean("transparentStatusBar", transparentStatusBar);
-                editor.putBoolean("residentNotification", residentNotification);
-                editor.putBoolean("hideProxySponsorChannel", hideProxySponsorChannel);
-                editor.putBoolean("saveCacheToExternalFilesDir", saveCacheToExternalFilesDir);
-                editor.putBoolean("showAddToSavedMessages", showAddToSavedMessages);
-                editor.putBoolean("showReport", showReport);
-                editor.putBoolean("showPrPr", showPrPr);
-                editor.putBoolean("showViewHistory", showViewHistory);
-                editor.putBoolean("showAdminActions", showAdminActions);
-                editor.putBoolean("showChangePermissions", showChangePermissions);
-                editor.putBoolean("showDeleteDownloadedFile", showDeleteDownloadedFile);
-                editor.putBoolean("showMessageDetails", showMessageDetails);
-                editor.putBoolean("showTranslate", showTranslate);
-                editor.putBoolean("showRepeat", showRepeat);
-                editor.putBoolean("newYear", newYear);
-                editor.putBoolean("unlimitedFavedStickers", unlimitedFavedStickers);
-                editor.putBoolean("unlimitedPinnedDialogs", unlimitedPinnedDialogs);
-                editor.putBoolean("disablePhotoSideAction", disablePhotoSideAction);
-                editor.putBoolean("hideKeyboardOnChatScroll", hideKeyboardOnChatScroll);
-                editor.putBoolean("openArchiveOnPull", openArchiveOnPull);
-                editor.putBoolean("showHiddenFeature2", showHiddenFeature);
-                editor.putBoolean("avatarAsDrawerBackground", avatarAsDrawerBackground);
-                editor.putBoolean("useSystemEmoji", useSystemEmoji);
-                editor.putBoolean("showTabsOnForward", showTabsOnForward);
-                editor.putBoolean("rearVideoMessages", rearVideoMessages);
-                editor.putBoolean("hideAllTab", hideAllTab);
-                editor.putBoolean("confirmAVMessage", confirmAVMessage);
-                editor.putBoolean("askBeforeCall", askBeforeCall);
-                editor.putBoolean("shouldNOTTrustMe", shouldNOTTrustMe);
-                editor.putBoolean("disableNumberRounding", disableNumberRounding);
-                editor.putBoolean("disableAppBarShadow", disableAppBarShadow);
-                editor.putBoolean("mediaPreview", mediaPreview);
-                editor.putBoolean("autoPauseVideo", autoPauseVideo);
-                editor.putBoolean("disableProximityEvents", disableProximityEvents);
-                editor.putFloat("stickerSize", stickerSize);
-                editor.putInt("typeface", typeface);
-                editor.putInt("nameOrder", nameOrder);
-                editor.putInt("mapPreviewProvider", mapPreviewProvider);
-                editor.putInt("translationProvider", translationProvider);
-                editor.putInt("eventType", eventType);
-                editor.putInt("actionBarDecoration", actionBarDecoration);
-                editor.putInt("tabsTitleType", tabsTitleType);
-                editor.putInt("idType", idType);
-                editor.commit();
+                tcp2wsServer.setTls(wsEnableTLS).setIfMTP(wsUseMTP).setIfDoH(wsUseDoH);
             } catch (Exception e) {
                 FileLog.e(e);
             }
         }
-    }*/
+    }
 
     public static void loadConfig() {
         synchronized (sync) {
             if (configLoaded) {
                 return;
             }
+            isChineseUser = ApplicationLoader.applicationContext.getResources().getBoolean(R.bool.isChineseUser);
 
             SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
             useIPv6 = preferences.getBoolean("useIPv6", false);
             hidePhone = preferences.getBoolean("hidePhone", true);
             ignoreBlocked = preferences.getBoolean("ignoreBlocked2", false);
             forceTablet = preferences.getBoolean("forceTablet", false);
-            typeface = preferences.getInt("typeface", Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP ? 1 : 0);
             nameOrder = preferences.getInt("nameOrder", 1);
             transparentStatusBar = preferences.getBoolean("transparentStatusBar", false);
             residentNotification = preferences.getBoolean("residentNotification", false);
             hideProxySponsorChannel = preferences.getBoolean("hideProxySponsorChannel2", false);
-            saveCacheToExternalFilesDir = preferences.getBoolean("saveCacheToExternalFilesDir", true);
+            saveCacheToExternalFilesDir = !BuildVars.NO_SCOPED_STORAGE || preferences.getBoolean("saveCacheToExternalFilesDir", true);
             showAddToSavedMessages = preferences.getBoolean("showAddToSavedMessages", true);
             showReport = preferences.getBoolean("showReport", false);
-            showPrPr = preferences.getBoolean("showPrPr", false);
+            showPrPr = preferences.getBoolean("showPrPr", isChineseUser);
             showViewHistory = preferences.getBoolean("showViewHistory", false);
             showAdminActions = preferences.getBoolean("showAdminActions", false);
             showChangePermissions = preferences.getBoolean("showChangePermissions", false);
@@ -200,10 +201,10 @@ public class NekoConfig {
             stickerSize = preferences.getFloat("stickerSize", 14.0f);
             unlimitedFavedStickers = preferences.getBoolean("unlimitedFavedStickers", false);
             unlimitedPinnedDialogs = preferences.getBoolean("unlimitedPinnedDialogs", false);
-            translationProvider = preferences.getInt("translationProvider", 1);
+            translationProvider = preferences.getInt("translationProvider", isChineseUser ? Translator.PROVIDER_LINGO : Translator.PROVIDER_GOOGLE);
             disablePhotoSideAction = preferences.getBoolean("disablePhotoSideAction", true);
             openArchiveOnPull = preferences.getBoolean("openArchiveOnPull", false);
-            showHiddenFeature = preferences.getBoolean("showHiddenFeature3", false);
+            showHiddenFeature = preferences.getBoolean("showHiddenFeature5", false);
             hideKeyboardOnChatScroll = preferences.getBoolean("hideKeyboardOnChatScroll", false);
             avatarAsDrawerBackground = preferences.getBoolean("avatarAsDrawerBackground", false);
             avatarBackgroundBlur = preferences.getBoolean("avatarBackgroundBlur", false);
@@ -224,19 +225,54 @@ public class NekoConfig {
             disableProximityEvents = preferences.getBoolean("disableProximityEvents", false);
             customEmojiFontPath = preferences.getString("customEmojiFontPath", "");
             customEmojiFont = preferences.getBoolean("customEmojiFont", false);
-            mapDriftingFix = preferences.getBoolean("mapDriftingFix", false);
+            mapDriftingFix = preferences.getBoolean("mapDriftingFix", isChineseUser);
             increaseVoiceMessageQuality = preferences.getBoolean("increaseVoiceMessageQuality", false);
             disableInstantCamera = preferences.getBoolean("disableInstantCamera", false);
             tryToOpenAllLinksInIV = preferences.getBoolean("tryToOpenAllLinksInIV", false);
             enableAnalytics = preferences.getBoolean("enableAnalytics", true);
             formatTimeWithSeconds = preferences.getBoolean("formatTimeWithSeconds", false);
-            lastSuccessfulCheckUpdateTime = preferences.getLong("lastSuccessfulCheckUpdateTime", 0);
             accentAsNotificationColor = preferences.getBoolean("accentAsNotificationColor", false);
             silenceNonContacts = preferences.getBoolean("silenceNonContacts", false);
             swipeToPiP = preferences.getBoolean("swipeToPiP", false);
             showNoQuoteForward = preferences.getBoolean("showNoQuoteForward", true);
+            wsEnableTLS = preferences.getBoolean("wsEnableTLS", true);
+            wsUseMTP = preferences.getBoolean("wsUseMTP", false);
+            wsUseDoH = preferences.getBoolean("wsUseDoH", true);
+            translationTarget = preferences.getString("translationTarget", "app");
+            maxRecentStickers = preferences.getInt("maxRecentStickers", 20);
+            disableJumpToNextChannel = preferences.getBoolean("disableJumpToNextChannel", false);
+            disableGreetingSticker = preferences.getBoolean("disableGreetingSticker", false);
+            blockSponsoredMessage = preferences.getBoolean("blockSponsoredMessage", false);
             configLoaded = true;
         }
+    }
+
+    public static boolean isChatCat(TLRPC.Chat chat) {
+        return Arrays.stream(OFFICIAL_CHANNELS).anyMatch(id -> id == chat.id);
+    }
+
+    public static void setWsUseMTP(boolean use) {
+        wsUseMTP = use;
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.putBoolean("wsUseMTP", wsUseMTP);
+        editor.commit();
+    }
+
+    public static void toggleWsEnableDoH() {
+        wsUseDoH = !wsUseDoH;
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.putBoolean("wsUseDoH", wsUseDoH);
+        editor.commit();
+    }
+
+    public static void toggleWsEnableTLS() {
+        wsEnableTLS = !wsEnableTLS;
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.putBoolean("wsEnableTLS", wsEnableTLS);
+        editor.commit();
     }
 
     public static void toggleShowAddToSavedMessages() {
@@ -344,27 +380,11 @@ public class NekoConfig {
         editor.commit();
     }
 
-    public static void toggleTypeface() {
-        typeface = typeface == 0 ? 1 : 0;
-        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
-        SharedPreferences.Editor editor = preferences.edit();
-        editor.putInt("typeface", typeface);
-        editor.commit();
-    }
-
     public static void setNameOrder(int order) {
         nameOrder = order;
         SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
         SharedPreferences.Editor editor = preferences.edit();
         editor.putInt("nameOrder", nameOrder);
-        editor.commit();
-    }
-
-    public static void toggleTransparentStatusBar() {
-        transparentStatusBar = !transparentStatusBar;
-        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
-        SharedPreferences.Editor editor = preferences.edit();
-        editor.putBoolean("transparentStatusBar", transparentStatusBar);
         editor.commit();
     }
 
@@ -450,6 +470,22 @@ public class NekoConfig {
         editor.commit();
     }
 
+    public static void setTranslationTarget(String target) {
+        translationTarget = target;
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.putString("translationTarget", translationTarget);
+        editor.commit();
+    }
+
+    public static void setDeepLFormality(int formality) {
+        deepLFormality = formality;
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.putInt("deepLFormality", deepLFormality);
+        editor.commit();
+    }
+
     public static void toggleDisablePhotoSideAction() {
         disablePhotoSideAction = !disablePhotoSideAction;
         SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
@@ -470,7 +506,7 @@ public class NekoConfig {
         showHiddenFeature = !showHiddenFeature;
         SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
         SharedPreferences.Editor editor = preferences.edit();
-        editor.putBoolean("showHiddenFeature3", showHiddenFeature);
+        editor.putBoolean("showHiddenFeature5", showHiddenFeature);
         editor.commit();
     }
 
@@ -578,6 +614,14 @@ public class NekoConfig {
         editor.commit();
     }
 
+    public static void toggleDisableGreetingSticker() {
+        disableGreetingSticker = !disableGreetingSticker;
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.putBoolean("disableGreetingSticker", disableGreetingSticker);
+        editor.commit();
+    }
+
     public static void toggleDisableAppBarShadow() {
         disableAppBarShadow = !disableAppBarShadow;
         SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
@@ -658,14 +702,6 @@ public class NekoConfig {
         editor.commit();
     }
 
-    public static void setLastSuccessfulCheckUpdateTime(long time) {
-        lastSuccessfulCheckUpdateTime = time;
-        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
-        SharedPreferences.Editor editor = preferences.edit();
-        editor.putLong("lastSuccessfulCheckUpdateTime", lastSuccessfulCheckUpdateTime);
-        editor.commit();
-    }
-
     public static void toggleAccentAsNotificationColor() {
         accentAsNotificationColor = !accentAsNotificationColor;
         SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
@@ -690,11 +726,35 @@ public class NekoConfig {
         editor.commit();
     }
 
+    public static void toggleDisableJumpToNextChannel() {
+        disableJumpToNextChannel = !disableJumpToNextChannel;
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.putBoolean("disableJumpToNextChannel", disableJumpToNextChannel);
+        editor.commit();
+    }
+
     public static void toggleShowNoQuoteForward() {
         showNoQuoteForward = !showNoQuoteForward;
         SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
         SharedPreferences.Editor editor = preferences.edit();
         editor.putBoolean("showNoQuoteForward", showNoQuoteForward);
+        editor.commit();
+    }
+
+    public static void toggleBlockSponsoredMessage() {
+        blockSponsoredMessage = !blockSponsoredMessage;
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.putBoolean("blockSponsoredMessage", blockSponsoredMessage);
+        editor.commit();
+    }
+
+    public static void setMaxRecentStickers(int size) {
+        maxRecentStickers = size;
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.putInt("maxRecentStickers", maxRecentStickers);
         editor.commit();
     }
 
@@ -706,21 +766,29 @@ public class NekoConfig {
         editor.commit();
     }
 
-    public static void setCustomEmojiFontPath(String path) {
-        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
-        SharedPreferences.Editor editor = preferences.edit();
-        try {
+    public static boolean setCustomEmojiFontPath(String path) {
+        if (path != null) {
+            Typeface typeface;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                typeface = new Typeface.Builder(path)
+                        .build();
+            } else {
+                typeface = Typeface.createFromFile(path);
+            }
+            if (typeface == null || typeface.equals(Typeface.DEFAULT)) {
+                return false;
+            }
+            customEmojiTypeface = typeface;
             customEmojiFontPath = path;
-            customEmojiTypeface = Typeface.createFromFile(path);
-        } catch (Exception e) {
+        } else {
             customEmojiTypeface = null;
             customEmojiFontPath = null;
-            editor.remove("customEmojiFontPath");
-            editor.commit();
-            throw e;
         }
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = preferences.edit();
         editor.putString("customEmojiFontPath", customEmojiFontPath);
         editor.commit();
+        return true;
     }
 
     public static Typeface getSystemEmojiTypeface() {
@@ -761,8 +829,29 @@ public class NekoConfig {
             } catch (Exception e) {
                 FileLog.e(e);
                 customEmojiTypeface = null;
+                if (customEmojiFont) NekoConfig.toggleCustomEmojiFont();
+                setCustomEmojiFontPath(null);
             }
         }
         return customEmojiTypeface;
+    }
+
+    public static int getNotificationColor() {
+        if (accentAsNotificationColor) {
+            int color = 0;
+            if (Theme.getActiveTheme().hasAccentColors()) {
+                color = Theme.getActiveTheme().getAccentColor(Theme.getActiveTheme().currentAccentId);
+            }
+            if (color == 0) {
+                color = Theme.getColor(Theme.key_actionBarDefault) | 0xff000000;
+            }
+            float brightness = AndroidUtilities.computePerceivedBrightness(color);
+            if (brightness >= 0.721f || brightness <= 0.279f) {
+                color = Theme.getColor(Theme.key_windowBackgroundWhiteBlueHeader) | 0xff000000;
+            }
+            return color;
+        } else {
+            return 0xff11acfa;
+        }
     }
 }

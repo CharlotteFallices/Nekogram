@@ -58,6 +58,8 @@ import org.telegram.ui.Cells.TextSettingsCell;
 import org.telegram.ui.Components.AvatarDrawable;
 import org.telegram.ui.Components.CombinedDrawable;
 import org.telegram.ui.Components.EditTextEmoji;
+import org.telegram.ui.Components.RLottieDrawable;
+import org.telegram.ui.Components.RLottieImageView;
 import org.telegram.ui.Components.VerticalPositionAutoAnimator;
 import org.telegram.ui.Components.ImageUpdater;
 import org.telegram.ui.Components.BackupImageView;
@@ -82,7 +84,7 @@ public class GroupCreateFinalActivity extends BaseFragment implements Notificati
     private EditTextEmoji editText;
     private BackupImageView avatarImage;
     private View avatarOverlay;
-    private ImageView avatarEditor;
+    private RLottieImageView avatarEditor;
     private AnimatorSet avatarAnimation;
     private RadialProgressView avatarProgressView;
     private AvatarDrawable avatarDrawable;
@@ -100,12 +102,16 @@ public class GroupCreateFinalActivity extends BaseFragment implements Notificati
     private TLRPC.InputFile inputVideo;
     private String inputVideoPath;
     private double videoTimestamp;
-    private ArrayList<Integer> selectedContacts;
+    private ArrayList<Long> selectedContacts;
     private boolean createAfterUpload;
     private boolean donePressed;
     private ImageUpdater imageUpdater;
     private String nameToSet;
     private int chatType;
+
+    private RLottieDrawable cameraDrawable;
+    
+    private boolean forImport;
 
     private String currentGroupCreateAddress;
     private Location currentGroupCreateLocation;
@@ -116,7 +122,7 @@ public class GroupCreateFinalActivity extends BaseFragment implements Notificati
 
     public interface GroupCreateFinalActivityDelegate {
         void didStartChatCreation();
-        void didFinishChatCreation(GroupCreateFinalActivity fragment, int chatId);
+        void didFinishChatCreation(GroupCreateFinalActivity fragment, long chatId);
         void didFailChatCreation();
     }
 
@@ -128,6 +134,8 @@ public class GroupCreateFinalActivity extends BaseFragment implements Notificati
         avatarDrawable = new AvatarDrawable();
         currentGroupCreateAddress = args.getString("address");
         currentGroupCreateLocation = args.getParcelable("location");
+        forImport = args.getBoolean("forImport", false);
+        nameToSet = args.getString("title", null);
     }
 
     @Override
@@ -138,11 +146,17 @@ public class GroupCreateFinalActivity extends BaseFragment implements Notificati
         imageUpdater = new ImageUpdater(true);
         imageUpdater.parentFragment = this;
         imageUpdater.setDelegate(this);
-        selectedContacts = getArguments().getIntegerArrayList("result");
-        final ArrayList<Integer> usersToLoad = new ArrayList<>();
+        long[] contacts = getArguments().getLongArray("result");
+        if (contacts != null) {
+            selectedContacts = new ArrayList<>(contacts.length);
+            for (int a = 0; a < contacts.length; a++) {
+                selectedContacts.add(contacts[a]);
+            }
+        }
+        final ArrayList<Long> usersToLoad = new ArrayList<>();
         for (int a = 0; a < selectedContacts.size(); a++) {
-            Integer uid = selectedContacts.get(a);
-            if (MessagesController.getInstance(currentAccount).getUser(uid) == null) {
+            Long uid = selectedContacts.get(a);
+            if (getMessagesController().getUser(uid) == null) {
                 usersToLoad.add(uid);
             }
         }
@@ -163,7 +177,7 @@ public class GroupCreateFinalActivity extends BaseFragment implements Notificati
             }
             if (!users.isEmpty()) {
                 for (TLRPC.User user : users) {
-                    MessagesController.getInstance(currentAccount).putUser(user, true);
+                    getMessagesController().putUser(user, true);
                 }
             } else {
                 return false;
@@ -440,19 +454,34 @@ public class GroupCreateFinalActivity extends BaseFragment implements Notificati
             }
         };
         editTextContainer.addView(avatarOverlay, LayoutHelper.createFrame(64, 64, Gravity.TOP | (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT), LocaleController.isRTL ? 0 : 16, 16, LocaleController.isRTL ? 16 : 0, 16));
-        avatarOverlay.setOnClickListener(view -> imageUpdater.openMenu(avatar != null, () -> {
-            avatar = null;
-            avatarBig = null;
-            inputPhoto = null;
-            inputVideo = null;
-            inputVideoPath = null;
-            videoTimestamp = 0;
-            showAvatarProgress(false, true);
-            avatarImage.setImage(null, null, avatarDrawable, null);
-            avatarEditor.setImageResource(R.drawable.actions_setphoto);
-        }));
+        avatarOverlay.setOnClickListener(view -> {
+            imageUpdater.openMenu(avatar != null, () -> {
+                avatar = null;
+                avatarBig = null;
+                inputPhoto = null;
+                inputVideo = null;
+                inputVideoPath = null;
+                videoTimestamp = 0;
+                showAvatarProgress(false, true);
+                avatarImage.setImage(null, null, avatarDrawable, null);
+                avatarEditor.setAnimation(cameraDrawable);
+                cameraDrawable.setCurrentFrame(0);
+            }, dialog -> {
+                if (!imageUpdater.isUploadingImage()) {
+                    cameraDrawable.setCustomEndFrame(86);
+                    avatarEditor.playAnimation();
+                } else {
+                    cameraDrawable.setCurrentFrame(0, false);
+                }
+            });
+            cameraDrawable.setCurrentFrame(0);
+            cameraDrawable.setCustomEndFrame(43);
+            avatarEditor.playAnimation();
+        });
 
-        avatarEditor = new ImageView(context) {
+        cameraDrawable = new RLottieDrawable(R.raw.camera, "" + R.raw.camera, AndroidUtilities.dp(60), AndroidUtilities.dp(60), false, null);
+
+        avatarEditor = new RLottieImageView(context) {
             @Override
             public void invalidate(int l, int t, int r, int b) {
                 super.invalidate(l, t, r, b);
@@ -466,10 +495,10 @@ public class GroupCreateFinalActivity extends BaseFragment implements Notificati
             }
         };
         avatarEditor.setScaleType(ImageView.ScaleType.CENTER);
-        avatarEditor.setImageResource(R.drawable.actions_setphoto);
+        avatarEditor.setAnimation(cameraDrawable);
         avatarEditor.setEnabled(false);
         avatarEditor.setClickable(false);
-        avatarEditor.setPadding(AndroidUtilities.dp(2), 0, 0, 0);
+        avatarEditor.setPadding(AndroidUtilities.dp(2), 0, 0, AndroidUtilities.dp(1));
         editTextContainer.addView(avatarEditor, LayoutHelper.createFrame(64, 64, Gravity.TOP | (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT), LocaleController.isRTL ? 0 : 16, 16, LocaleController.isRTL ? 16 : 0, 16));
 
         avatarProgressView = new RadialProgressView(context) {
@@ -577,7 +606,7 @@ public class GroupCreateFinalActivity extends BaseFragment implements Notificati
                 createAfterUpload = true;
             } else {
                 showEditDoneProgress(true);
-                reqId = MessagesController.getInstance(currentAccount).createChat(editText.getText().toString(), selectedContacts, null, chatType, currentGroupCreateLocation, currentGroupCreateAddress, GroupCreateFinalActivity.this);
+                reqId = getMessagesController().createChat(editText.getText().toString(), selectedContacts, null, chatType, forImport, currentGroupCreateLocation, currentGroupCreateAddress, GroupCreateFinalActivity.this);
             }
         });
 
@@ -627,7 +656,7 @@ public class GroupCreateFinalActivity extends BaseFragment implements Notificati
                     if (delegate != null) {
                         delegate.didStartChatCreation();
                     }
-                    MessagesController.getInstance(currentAccount).createChat(editText.getText().toString(), selectedContacts, null, chatType, currentGroupCreateLocation, currentGroupCreateAddress, GroupCreateFinalActivity.this);
+                    getMessagesController().createChat(editText.getText().toString(), selectedContacts, null, chatType, forImport, currentGroupCreateLocation, currentGroupCreateAddress, GroupCreateFinalActivity.this);
                 }
                 showAvatarProgress(false, true);
                 avatarEditor.setImageDrawable(null);
@@ -718,7 +747,7 @@ public class GroupCreateFinalActivity extends BaseFragment implements Notificati
         }
         if (editText != null) {
             String text = editText.getText().toString();
-            if (text != null && text.length() != 0) {
+            if (text.length() != 0) {
                 args.putString("nameTextView", text);
             }
         }
@@ -774,17 +803,17 @@ public class GroupCreateFinalActivity extends BaseFragment implements Notificati
             }
         } else if (id == NotificationCenter.chatDidCreated) {
             reqId = 0;
-            int chat_id = (Integer) args[0];
+            long chatId = (Long) args[0];
             if (delegate != null) {
-                delegate.didFinishChatCreation(this, chat_id);
+                delegate.didFinishChatCreation(this, chatId);
             } else {
                 NotificationCenter.getInstance(currentAccount).postNotificationName(NotificationCenter.closeChats);
                 Bundle args2 = new Bundle();
-                args2.putInt("chat_id", chat_id);
+                args2.putLong("chat_id", chatId);
                 presentFragment(new ChatActivity(args2), true);
             }
             if (inputPhoto != null || inputVideo != null) {
-                MessagesController.getInstance(currentAccount).changeChatAvatar(chat_id, null, inputPhoto, inputVideo, videoTimestamp, inputVideoPath, avatar, avatarBig);
+                getMessagesController().changeChatAvatar(chatId, null, inputPhoto, inputVideo, videoTimestamp, inputVideoPath, avatar, avatarBig, null);
             }
         }
     }
@@ -883,7 +912,7 @@ public class GroupCreateFinalActivity extends BaseFragment implements Notificati
                     view = headerCell;
                     break;
                 case 2:
-                    view = new GroupCreateUserCell(context, false, 3, false);
+                    view = new GroupCreateUserCell(context, 0, 3, false);
                     break;
                 case 3:
                 default:
@@ -907,7 +936,7 @@ public class GroupCreateFinalActivity extends BaseFragment implements Notificati
                 }
                 case 2: {
                     GroupCreateUserCell cell = (GroupCreateUserCell) holder.itemView;
-                    TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(selectedContacts.get(position - usersStartRow));
+                    TLRPC.User user = getMessagesController().getUser(selectedContacts.get(position - usersStartRow));
                     cell.setObject(user, null, null);
                     break;
                 }

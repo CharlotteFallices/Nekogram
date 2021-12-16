@@ -8,18 +8,20 @@
 
 package org.telegram.ui;
 
+import android.app.Activity;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.content.res.Configuration;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
-import android.hardware.biometrics.BiometricManager;
 import android.os.Build;
 import android.os.Vibrator;
 import android.text.Editable;
 import android.text.InputFilter;
 import android.text.InputType;
+import android.text.SpannableStringBuilder;
 import android.text.TextUtils;
 import android.text.TextWatcher;
 import android.text.method.DigitsKeyListener;
@@ -46,7 +48,6 @@ import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.Utilities;
-import org.telegram.messenger.support.fingerprint.FingerprintManagerCompat;
 import org.telegram.ui.ActionBar.ActionBar;
 import org.telegram.ui.ActionBar.ActionBarMenu;
 import org.telegram.ui.ActionBar.ActionBarMenuItem;
@@ -67,6 +68,8 @@ import java.util.ArrayList;
 
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
+import tw.nekomimi.nekogram.helpers.BiometricPromptHelper;
 
 public class PasscodeActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate {
 
@@ -326,7 +329,7 @@ public class PasscodeActivity extends BaseFragment implements NotificationCenter
                     builder.setTitle(LocaleController.getString("AutoLock", R.string.AutoLock));
                     final NumberPicker numberPicker = new NumberPicker(getParentActivity());
                     numberPicker.setMinValue(0);
-                    numberPicker.setMaxValue(4);
+                    numberPicker.setMaxValue(5);
                     if (SharedConfig.autoLockIn == 0) {
                         numberPicker.setValue(0);
                     } else if (SharedConfig.autoLockIn == 60) {
@@ -337,6 +340,8 @@ public class PasscodeActivity extends BaseFragment implements NotificationCenter
                         numberPicker.setValue(3);
                     } else if (SharedConfig.autoLockIn == 60 * 60 * 5) {
                         numberPicker.setValue(4);
+                    } else if (SharedConfig.autoLockIn == Integer.MAX_VALUE) {
+                        numberPicker.setValue(5);
                     }
                     numberPicker.setFormatter(value -> {
                         if (value == 0) {
@@ -349,6 +354,8 @@ public class PasscodeActivity extends BaseFragment implements NotificationCenter
                             return LocaleController.formatString("AutoLockInTime", R.string.AutoLockInTime, LocaleController.formatPluralString("Hours", 1));
                         } else if (value == 4) {
                             return LocaleController.formatString("AutoLockInTime", R.string.AutoLockInTime, LocaleController.formatPluralString("Hours", 5));
+                        } else if (value == 5) {
+                            return LocaleController.formatString("AutoLockInstant", R.string.AutoLockInstant);
                         }
                         return "";
                     });
@@ -365,6 +372,8 @@ public class PasscodeActivity extends BaseFragment implements NotificationCenter
                             SharedConfig.autoLockIn = 60 * 60;
                         } else if (which == 4) {
                             SharedConfig.autoLockIn = 60 * 60 * 5;
+                        } else if (which == 5) {
+                            SharedConfig.autoLockIn = Integer.MAX_VALUE;
                         }
                         listAdapter.notifyItemChanged(position);
                         UserConfig.getInstance(currentAccount).saveConfig(false);
@@ -426,19 +435,7 @@ public class PasscodeActivity extends BaseFragment implements NotificationCenter
         if (SharedConfig.passcodeHash.length() > 0) {
             try {
                 if (Build.VERSION.SDK_INT >= 23) {
-                    boolean useBiometric;
-                    if (Build.VERSION.SDK_INT >= 29) {
-                        BiometricManager biometricManager = (BiometricManager) ApplicationLoader.applicationContext.getSystemService(Context.BIOMETRIC_SERVICE);
-                        if (Build.VERSION.SDK_INT >= 30) {
-                            useBiometric = biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_WEAK) == BiometricManager.BIOMETRIC_SUCCESS;
-                        } else {
-                            useBiometric = biometricManager.canAuthenticate() == BiometricManager.BIOMETRIC_SUCCESS;
-                        }
-                    } else {
-                        FingerprintManagerCompat fingerprintManager = FingerprintManagerCompat.from(ApplicationLoader.applicationContext);
-                        useBiometric = fingerprintManager.isHardwareDetected();
-                    }
-                    if (useBiometric) {
+                    if (BiometricPromptHelper.hasBiometricEnrolled()) {
                         fingerprintRow = rowCount++;
                     }
                 }
@@ -609,6 +606,7 @@ public class PasscodeActivity extends BaseFragment implements NotificationCenter
     private class ListAdapter extends RecyclerListView.SelectionAdapter {
 
         private Context mContext;
+        private Boolean hasWidgets;
 
         public ListAdapter(Context context) {
             mContext = context;
@@ -672,7 +670,9 @@ public class PasscodeActivity extends BaseFragment implements NotificationCenter
                         }
                     } else if (position == autoLockRow) {
                         String val;
-                        if (SharedConfig.autoLockIn == 0) {
+                        if (SharedConfig.autoLockIn == Integer.MAX_VALUE) {
+                            val = LocaleController.formatString("AutoLockInstant", R.string.AutoLockInstant);
+                        } else if (SharedConfig.autoLockIn == 0) {
                             val = LocaleController.formatString("AutoLockDisabled", R.string.AutoLockDisabled);
                         } else if (SharedConfig.autoLockIn < 60 * 60) {
                             val = LocaleController.formatString("AutoLockInTime", R.string.AutoLockInTime, LocaleController.formatPluralString("Minutes", SharedConfig.autoLockIn / 60));
@@ -690,7 +690,15 @@ public class PasscodeActivity extends BaseFragment implements NotificationCenter
                 case 2: {
                     TextInfoPrivacyCell cell = (TextInfoPrivacyCell) holder.itemView;
                     if (position == passcodeDetailRow) {
-                        cell.setText(LocaleController.getString("ChangePasscodeInfo", R.string.ChangePasscodeInfo));
+                        SpannableStringBuilder stringBuilder = new SpannableStringBuilder(LocaleController.getString("ChangePasscodeInfo", R.string.ChangePasscodeInfo));
+                        if (hasWidgets == null) {
+                            SharedPreferences preferences = mContext.getSharedPreferences("shortcut_widget", Activity.MODE_PRIVATE);
+                            hasWidgets = !preferences.getAll().isEmpty();
+                        }
+                        if (hasWidgets) {
+                            stringBuilder.append("\n\n").append(AndroidUtilities.replaceTags(LocaleController.getString("WidgetPasscodeEnable2", R.string.WidgetPasscodeEnable2)));
+                        }
+                        cell.setText(stringBuilder);
                         if (autoLockDetailRow != -1) {
                             cell.setBackgroundDrawable(Theme.getThemedDrawable(mContext, R.drawable.greydivider, Theme.key_windowBackgroundGrayShadow));
                         } else {

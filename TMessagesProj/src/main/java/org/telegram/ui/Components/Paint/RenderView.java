@@ -9,6 +9,8 @@ import android.view.MotionEvent;
 import android.view.TextureView;
 import android.view.View;
 
+import com.google.android.exoplayer2.util.Log;
+
 import javax.microedition.khronos.egl.EGL10;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.egl.EGLContext;
@@ -50,6 +52,8 @@ public class RenderView extends TextureView {
 
     private boolean shuttingDown;
 
+    public boolean isColorPicker = false;
+
     public RenderView(Context context, Painting paint, Bitmap b) {
         super(context);
         setOpaque(false);
@@ -64,7 +68,6 @@ public class RenderView extends TextureView {
                 if (surface == null || internal != null) {
                     return;
                 }
-
                 internal = new CanvasInternal(surface);
                 internal.setBufferSize(width, height);
                 updateTransform();
@@ -153,6 +156,8 @@ public class RenderView extends TextureView {
         if (internal == null || !internal.initialized || !internal.ready) {
             return true;
         }
+        if (isColorPicker) return true;
+
         input.process(event, getScaleX());
         return true;
     }
@@ -263,7 +268,7 @@ public class RenderView extends TextureView {
         private EGLContext eglContext;
         private EGLSurface eglSurface;
         private boolean initialized;
-        private boolean ready;
+        private volatile boolean ready;
 
         private int bufferWidth;
         private int bufferHeight;
@@ -438,7 +443,7 @@ public class RenderView extends TextureView {
                 }
 
                 if (!ready) {
-                    queue.postRunnable(() -> ready = true, 200);
+                    ready = true;
                 }
             }
         };

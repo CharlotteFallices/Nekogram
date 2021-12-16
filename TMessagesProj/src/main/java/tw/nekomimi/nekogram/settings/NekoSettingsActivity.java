@@ -1,21 +1,26 @@
 package tw.nekomimi.nekogram.settings;
 
 import android.annotation.SuppressLint;
+import android.app.assist.AssistContent;
 import android.content.Context;
-import android.view.Gravity;
+import android.net.Uri;
+import android.os.Build;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.DefaultItemAnimator;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessagesController;
+import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
+import org.telegram.messenger.SharedConfig;
 import org.telegram.messenger.browser.Browser;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.ActionBar;
@@ -32,21 +37,23 @@ import org.telegram.ui.Cells.TextDetailSettingsCell;
 import org.telegram.ui.Cells.TextInfoPrivacyCell;
 import org.telegram.ui.Cells.TextSettingsCell;
 import org.telegram.ui.Components.AlertsCreator;
+import org.telegram.ui.Components.EmbedBottomSheet;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.RecyclerListView;
+import org.telegram.ui.LaunchActivity;
 
 import java.util.ArrayList;
 
 import tw.nekomimi.nekogram.NekoConfig;
-import tw.nekomimi.nekogram.helpers.AnalyticsHelper;
-import tw.nekomimi.nekogram.helpers.DonateHelper;
-import tw.nekomimi.nekogram.updater.UpdateHelper;
+import tw.nekomimi.nekogram.helpers.NewsHelper;
+import tw.nekomimi.nekogram.helpers.UpdateHelper;
 
-@SuppressLint("RtlHardcoded")
-public class NekoSettingsActivity extends BaseFragment implements UpdateHelper.UpdateHelperDelegate {
+@SuppressLint({"RtlHardcoded", "NotifyDataSetChanged"})
+public class NekoSettingsActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate {
 
     private RecyclerListView listView;
     private ListAdapter listAdapter;
+    private final ArrayList<NewsHelper.NewsItem> news = NewsHelper.getNews();
 
     private boolean sensitiveCanChange = false;
     private boolean sensitiveEnabled = false;
@@ -62,13 +69,14 @@ public class NekoSettingsActivity extends BaseFragment implements UpdateHelper.U
 
     private int aboutRow;
     private int channelRow;
-    private int googlePlayRow;
+    private int websiteRow;
     private int sourceCodeRow;
     private int translationRow;
-    private int donateRow;
     private int checkUpdateRow;
-    private int sponsorRow;
     private int about2Row;
+
+    private int sponsorRow;
+    private int sponsor2Row;
 
     private void checkSensitive() {
         TLRPC.TL_account_getContentSettings req = new TLRPC.TL_account_getContentSettings();
@@ -87,10 +95,12 @@ public class NekoSettingsActivity extends BaseFragment implements UpdateHelper.U
     public boolean onFragmentCreate() {
         super.onFragmentCreate();
 
+        NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.appUpdateAvailable);
         updateRows();
 
         return true;
     }
+
 
     @SuppressLint("NewApi")
     @Override
@@ -117,10 +127,11 @@ public class NekoSettingsActivity extends BaseFragment implements UpdateHelper.U
         FrameLayout frameLayout = (FrameLayout) fragmentView;
 
         listView = new RecyclerListView(context);
-        listView.setVerticalScrollBarEnabled(false);
         listView.setLayoutManager(new LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false));
-        frameLayout.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.TOP | Gravity.LEFT));
+        listView.setVerticalScrollBarEnabled(false);
         listView.setAdapter(listAdapter);
+        ((DefaultItemAnimator) listView.getItemAnimator()).setDelayAnimations(false);
+        frameLayout.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
         listView.setOnItemClickListener((view, position, x, y) -> {
             if (position == chatRow) {
                 presentFragment(new NekoChatSettingsActivity());
@@ -130,21 +141,19 @@ public class NekoSettingsActivity extends BaseFragment implements UpdateHelper.U
                 presentFragment(new NekoExperimentalSettingsActivity(sensitiveCanChange, sensitiveEnabled));
             } else if (position == channelRow) {
                 MessagesController.getInstance(currentAccount).openByUserName(LocaleController.getString("OfficialChannelUsername", R.string.OfficialChannelUsername), this, 1);
-            } else if (position == donateRow) {
-                new DonateHelper(getParentActivity()).showDonationDialog();
             } else if (position == translationRow) {
                 Browser.openUrl(getParentActivity(), "https://neko.crowdin.com/nekogram");
-            } else if (position == googlePlayRow) {
-                Browser.openUrl(getParentActivity(), "https://play.google.com/store/apps/details?id=tw.nekomimi.nekogram");
+            } else if (position == websiteRow) {
+                Browser.openUrl(getParentActivity(), "https://nekogram.app");
             } else if (position == sourceCodeRow) {
                 Browser.openUrl(getParentActivity(), "https://gitlab.com/Nekogram/Nekogram");
-            } else if (position == sponsorRow) {
-                AnalyticsHelper.trackEvent("open_sponsor");
-                Browser.openUrl(getParentActivity(), "https://gamma.pcr.cy/auth/register?code=neko");
             } else if (position == checkUpdateRow) {
-                UpdateHelper.getInstance().checkNewVersionAvailable(this, false);
+                ((LaunchActivity) getParentActivity()).checkAppUpdate(true);
                 checkingUpdate = true;
                 listAdapter.notifyItemChanged(checkUpdateRow);
+            } else if (position >= sponsorRow && position < sponsor2Row) {
+                NewsHelper.NewsItem item = news.get(position - sponsorRow);
+                Browser.openUrl(getParentActivity(), item.url);
             }
         });
         listView.setOnItemLongClickListener(new RecyclerListView.OnItemLongClickListener() {
@@ -157,10 +166,11 @@ public class NekoSettingsActivity extends BaseFragment implements UpdateHelper.U
                     pressCount++;
                     if (pressCount >= 2) {
                         NekoConfig.toggleShowHiddenFeature();
-                        listView.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
+                        view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
                         if (NekoConfig.showHiddenFeature) {
                             AndroidUtilities.shakeView(view, 2, 0);
                         }
+                        EmbedBottomSheet.show(getParentActivity(), null, null, NekoConfig.isChineseUser ? "BiliBili" : "YouTube", "Nekogram Secrets", "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "https://www.youtube.com/embed/dQw4w9WgXcQ", 1280, 720, 0, false);
                         return true;
                     }
                 }
@@ -190,17 +200,20 @@ public class NekoSettingsActivity extends BaseFragment implements UpdateHelper.U
 
         aboutRow = rowCount++;
         channelRow = rowCount++;
-        googlePlayRow = -1;
+        websiteRow = rowCount++;
         sourceCodeRow = rowCount++;
         translationRow = rowCount++;
-        donateRow = rowCount++;
-        checkUpdateRow = AnalyticsHelper.GOOGLE_PLAY ? -1 : rowCount++;
-        if (!LocaleController.getString("SponsorTitle", R.string.SponsorTitle).equals("dummy")) {
+        checkUpdateRow = rowCount++;
+        about2Row = rowCount++;
+
+        if (news.size() != 0) {
             sponsorRow = rowCount++;
+            rowCount += news.size() - 1;
+            sponsor2Row = rowCount++;
         } else {
             sponsorRow = -1;
+            sponsor2Row = -1;
         }
-        about2Row = rowCount++;
 
         if (listAdapter != null) {
             listAdapter.notifyDataSetChanged();
@@ -249,9 +262,18 @@ public class NekoSettingsActivity extends BaseFragment implements UpdateHelper.U
     }
 
     @Override
-    public void didCheckNewVersionAvailable(String error) {
-        checkingUpdate = false;
-        AndroidUtilities.runOnUIThread(() -> listAdapter.notifyItemChanged(checkUpdateRow));
+    public void didReceivedNotification(int id, int account, Object... args) {
+        if (id == NotificationCenter.appUpdateAvailable) {
+            checkingUpdate = false;
+            AndroidUtilities.runOnUIThread(() -> listAdapter.notifyItemChanged(checkUpdateRow));
+        }
+    }
+
+    @Override
+    public void onFragmentDestroy() {
+        super.onFragmentDestroy();
+
+        NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.appUpdateAvailable);
     }
 
     private class ListAdapter extends RecyclerListView.SelectionAdapter {
@@ -271,7 +293,7 @@ public class NekoSettingsActivity extends BaseFragment implements UpdateHelper.U
         public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
             switch (holder.getItemViewType()) {
                 case 1: {
-                    if (position == about2Row) {
+                    if ((position == about2Row && sponsor2Row == -1) || position == sponsor2Row) {
                         holder.itemView.setBackground(Theme.getThemedDrawable(mContext, R.drawable.greydivider_bottom, Theme.key_windowBackgroundGrayShadow));
                     } else {
                         holder.itemView.setBackground(Theme.getThemedDrawable(mContext, R.drawable.greydivider, Theme.key_windowBackgroundGrayShadow));
@@ -293,8 +315,8 @@ public class NekoSettingsActivity extends BaseFragment implements UpdateHelper.U
                     TextSettingsCell textCell = (TextSettingsCell) holder.itemView;
                     if (position == channelRow) {
                         textCell.setTextAndValue(LocaleController.getString("OfficialChannel", R.string.OfficialChannel), "@" + LocaleController.getString("OfficialChannelUsername", R.string.OfficialChannelUsername), true);
-                    } else if (position == googlePlayRow) {
-                        textCell.setText(LocaleController.getString("GooglePlay", R.string.GooglePlay), true);
+                    } else if (position == websiteRow) {
+                        textCell.setTextAndValue(LocaleController.getString("OfficialSite", R.string.OfficialSite), "nekogram.app", true);
                     } else if (position == sourceCodeRow) {
                         textCell.setText(LocaleController.getString("ViewSourceCode", R.string.ViewSourceCode), true);
                     }
@@ -311,16 +333,16 @@ public class NekoSettingsActivity extends BaseFragment implements UpdateHelper.U
                 }
                 case 6: {
                     TextDetailSettingsCell textCell = (TextDetailSettingsCell) holder.itemView;
+                    textCell.setMultilineDetail(true);
                     if (position == translationRow) {
                         textCell.setTextAndValue(LocaleController.getString("Translation", R.string.Translation), LocaleController.getString("TranslationAbout", R.string.TranslationAbout), true);
-                    } else if (position == donateRow) {
-                        textCell.setTextAndValue(LocaleController.getString("Donate", R.string.Donate), LocaleController.getString("DonateAbout", R.string.DonateAbout), position + 1 != about2Row);
-                    } else if (position == sponsorRow) {
-                        textCell.setTextAndValue(LocaleController.getString("SponsorTitle", R.string.SponsorTitle), LocaleController.getString("SponsorContent", R.string.SponsorContent), false);
                     } else if (position == checkUpdateRow) {
                         textCell.setTextAndValue(LocaleController.getString("CheckUpdate", R.string.CheckUpdate),
                                 checkingUpdate ? LocaleController.getString("CheckingUpdate", R.string.CheckingUpdate) :
-                                        UpdateHelper.formatDateUpdate(NekoConfig.lastSuccessfulCheckUpdateTime), position + 1 != about2Row);
+                                        UpdateHelper.formatDateUpdate(SharedConfig.lastUpdateCheckTime), position + 1 != about2Row);
+                    } else if (position >= sponsorRow && position < sponsor2Row) {
+                        NewsHelper.NewsItem item = news.get(position - sponsorRow);
+                        textCell.setTextAndValue(item.title, item.summary, position + 1 != sponsor2Row);
                     }
                     break;
                 }
@@ -373,7 +395,7 @@ public class NekoSettingsActivity extends BaseFragment implements UpdateHelper.U
 
         @Override
         public int getItemViewType(int position) {
-            if (position == categories2Row || position == about2Row) {
+            if (position == categories2Row || position == about2Row || position == sponsor2Row) {
                 return 1;
             } else if (position > categoriesRow && position < categories2Row) {
                 return 2;
@@ -381,10 +403,17 @@ public class NekoSettingsActivity extends BaseFragment implements UpdateHelper.U
                 return 3;
             } else if (position == categoriesRow || position == aboutRow) {
                 return 4;
-            } else if (position >= translationRow && position < about2Row) {
+            } else if ((position >= translationRow && position < about2Row) || (position >= sponsorRow && position < sponsor2Row)) {
                 return 6;
             }
             return 2;
+        }
+    }
+
+    @Override
+    public void onProvideAssistContent(AssistContent outContent) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            outContent.setWebUri(Uri.parse("https://nekogram.app"));
         }
     }
 }

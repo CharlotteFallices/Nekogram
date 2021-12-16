@@ -3,21 +3,63 @@ package tw.nekomimi.nekogram.translator;
 import android.annotation.SuppressLint;
 import android.os.AsyncTask;
 
-import org.json.JSONException;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.R;
 import org.telegram.tgnet.TLRPC;
 
+import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.nio.charset.Charset;
 import java.util.List;
+import java.util.Locale;
+import java.util.Scanner;
+
+import tw.nekomimi.nekogram.NekoConfig;
 
 abstract public class BaseTranslator {
 
-    abstract protected String translate(String query, String tl) throws IOException, JSONException;
+    abstract protected String translate(String query, String tl) throws Exception;
 
-    abstract protected List<String> getTargetLanguages();
+    abstract public List<String> getTargetLanguages();
+
+    public String convertLanguageCode(String language, String country) {
+        return language;
+    }
 
     void startTask(Object query, String toLang, Translator.TranslateCallBack translateCallBack) {
         new MyAsyncTask().request(query, toLang, translateCallBack).execute();
+    }
+
+    public boolean supportLanguage(String language) {
+        return getTargetLanguages().contains(language);
+    }
+
+    public String getCurrentAppLanguage() {
+        String toLang;
+        Locale locale = LocaleController.getInstance().getCurrentLocale();
+        toLang = convertLanguageCode(locale.getLanguage(), locale.getCountry());
+        if (!supportLanguage(toLang)) {
+            toLang = convertLanguageCode(LocaleController.getString("LanguageCode", R.string.LanguageCode), null);
+        }
+        return toLang;
+    }
+
+    public String getTargetLanguage(String language) {
+        String toLang;
+        if (language.equals("app")) {
+            toLang = getCurrentAppLanguage();
+        } else {
+            toLang = language;
+        }
+        return toLang;
+    }
+
+    public String getCurrentTargetLanguage() {
+        return getTargetLanguage(NekoConfig.translationTarget);
     }
 
     @SuppressWarnings("deprecation")
@@ -82,5 +124,44 @@ abstract public class BaseTranslator {
             }
         }
 
+    }
+
+    public static class Http {
+        private final HttpURLConnection httpURLConnection;
+
+        public Http(String url) throws IOException {
+            httpURLConnection = (HttpURLConnection) new URL(url).openConnection();
+            httpURLConnection.setConnectTimeout(1000);
+            //httpURLConnection.setReadTimeout(2000);
+        }
+
+        public Http header(String key, String value) {
+            httpURLConnection.setRequestProperty(key, value);
+            return this;
+        }
+
+        public Http data(String data) throws IOException {
+            httpURLConnection.setDoOutput(true);
+            DataOutputStream dataOutputStream = new DataOutputStream(httpURLConnection.getOutputStream());
+            byte[] t = data.getBytes(Charset.defaultCharset());
+            dataOutputStream.write(t);
+            dataOutputStream.flush();
+            dataOutputStream.close();
+            return this;
+        }
+
+        public String request() throws IOException {
+            httpURLConnection.connect();
+            InputStream stream;
+            if (httpURLConnection.getResponseCode() < HttpURLConnection.HTTP_BAD_REQUEST) {
+                stream = httpURLConnection.getInputStream();
+            } else {
+                stream = httpURLConnection.getErrorStream();
+            }
+
+            return new Scanner(stream, "UTF-8")
+                    .useDelimiter("\\A")
+                    .next();
+        }
     }
 }

@@ -41,6 +41,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.MeasureSpec;
 import android.view.View.OnLayoutChangeListener;
+import android.view.ViewConfiguration;
 import android.view.ViewGroup;
 import android.view.ViewOutlineProvider;
 import android.view.animation.Animation;
@@ -59,7 +60,9 @@ import android.widget.TextView;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
+import org.telegram.messenger.UserConfig;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -104,10 +107,13 @@ public final class FloatingToolbar {
     };
 
     private final Comparator<MenuItem> mMenuItemComparator = (menuItem1, menuItem2) -> menuItem1.getOrder() - menuItem2.getOrder();
+    
+    private final Theme.ResourcesProvider resourcesProvider;
 
-    public FloatingToolbar(Context context, View windowView, int style) {
+    public FloatingToolbar(Context context, View windowView, int style, Theme.ResourcesProvider resourcesProvider) {
         mWindowView = windowView;
         currentStyle = style;
+        this.resourcesProvider = resourcesProvider;
         mPopup = new FloatingToolbarPopup(context, windowView);
     }
 
@@ -347,14 +353,18 @@ public final class FloatingToolbar {
             mDismissAnimation = createExitAnimation(mContentContainer, 150, new AnimatorListenerAdapter() {
                 @Override
                 public void onAnimationEnd(Animator animation) {
-                    mPopupWindow.dismiss();
-                    mContentContainer.removeAllViews();
+                    NotificationCenter.getInstance(UserConfig.selectedAccount).doOnIdle(() -> {
+                        mPopupWindow.dismiss();
+                        mContentContainer.removeAllViews();
+                    });
                 }
             });
             mHideAnimation = createExitAnimation(mContentContainer, 0, new AnimatorListenerAdapter() {
                 @Override
                 public void onAnimationEnd(Animator animation) {
-                    mPopupWindow.dismiss();
+                    NotificationCenter.getInstance(UserConfig.selectedAccount).doOnIdle(() -> {
+                        mPopupWindow.dismiss();
+                    });
                 }
             });
         }
@@ -965,7 +975,7 @@ public final class FloatingToolbar {
             return new LinearLayout(mContext) {
                 @Override
                 protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-                    if (isOverflowAnimating()) {
+                    if (isOverflowAnimating() && mMainPanelSize != null) {
                         widthMeasureSpec = MeasureSpec.makeMeasureSpec(mMainPanelSize.getWidth(), MeasureSpec.EXACTLY);
                     }
                     super.onMeasure(widthMeasureSpec, heightMeasureSpec);
@@ -986,14 +996,14 @@ public final class FloatingToolbar {
             overflowButton.setImageDrawable(mOverflow);
             int color;
             if (currentStyle == STYLE_DIALOG) {
-                color = Theme.getColor(Theme.key_dialogTextBlack);
-                overflowButton.setBackgroundDrawable(Theme.createSelectorDrawable(Theme.getColor(Theme.key_listSelector), 1));
+                color = getThemedColor(Theme.key_dialogTextBlack);
+                overflowButton.setBackgroundDrawable(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), 1));
             } else if (currentStyle == STYLE_BLACK) {
                 color = 0xfffafafa;
                 overflowButton.setBackgroundDrawable(Theme.createSelectorDrawable(0x40ffffff, 1));
             } else {
-                color = Theme.getColor(Theme.key_windowBackgroundWhiteBlackText);
-                overflowButton.setBackgroundDrawable(Theme.createSelectorDrawable(Theme.getColor(Theme.key_listSelector), 1));
+                color = getThemedColor(Theme.key_windowBackgroundWhiteBlackText);
+                overflowButton.setBackgroundDrawable(Theme.createSelectorDrawable(getThemedColor(Theme.key_listSelector), 1));
             }
             mOverflow.setTint(color);
             mArrow.setTint(color);
@@ -1098,14 +1108,8 @@ public final class FloatingToolbar {
             OverflowPanel(FloatingToolbarPopup popup) {
                 super(popup.mContext);
                 this.mPopup = popup;
-                setVerticalScrollBarEnabled(false);
-                setOutlineProvider(new ViewOutlineProvider() {
-                    @Override
-                    public void getOutline(View view, Outline outline) {
-                        outline.setRoundRect(0, 0, view.getMeasuredWidth(), view.getMeasuredHeight(), AndroidUtilities.dp(6));
-                    }
-                });
-                setClipToOutline(true);
+                setScrollBarDefaultDelayBeforeFade(ViewConfiguration.getScrollDefaultDelay() * 3);
+                setScrollIndicators(View.SCROLL_INDICATOR_TOP | View.SCROLL_INDICATOR_BOTTOM);
             }
 
             @Override
@@ -1186,7 +1190,7 @@ public final class FloatingToolbar {
         menuItemButton.setOrientation(LinearLayout.HORIZONTAL);
         menuItemButton.setMinimumWidth(AndroidUtilities.dp(48));
         menuItemButton.setMinimumHeight(AndroidUtilities.dp(48));
-        menuItemButton.setPaddingRelative(AndroidUtilities.dp(16), 0, AndroidUtilities.dp(16), 0);
+        menuItemButton.setPaddingRelative(AndroidUtilities.dp(11), 0, AndroidUtilities.dp(11), 0);
 
         TextView textView = new TextView(context);
         textView.setGravity(Gravity.CENTER);
@@ -1198,13 +1202,13 @@ public final class FloatingToolbar {
         textView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
         textView.setFocusableInTouchMode(false);
         if (currentStyle == STYLE_DIALOG) {
-            textView.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
+            textView.setTextColor(getThemedColor(Theme.key_dialogTextBlack));
             menuItemButton.setBackgroundDrawable(Theme.getSelectorDrawable(false));
         } else if (currentStyle == STYLE_BLACK) {
             textView.setTextColor(0xfffafafa);
             menuItemButton.setBackgroundDrawable(Theme.getSelectorDrawable(0x40ffffff, false));
         } else if (currentStyle == STYLE_THEME) {
-            textView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+            textView.setTextColor(getThemedColor(Theme.key_windowBackgroundWhiteBlackText));
             menuItemButton.setBackgroundDrawable(Theme.getSelectorDrawable(false));
         }
         textView.setPaddingRelative(AndroidUtilities.dp(11), 0, 0, 0);
@@ -1245,18 +1249,23 @@ public final class FloatingToolbar {
         GradientDrawable shape = new GradientDrawable();
         shape.setShape(GradientDrawable.RECTANGLE);
         int r = AndroidUtilities.dp(6);
-        shape.setCornerRadii(new float[] { r, r, r, r, r, r, r, r });
+        shape.setCornerRadius(r);
         if (currentStyle == STYLE_DIALOG) {
-            shape.setColor(Theme.getColor(Theme.key_dialogBackground));
+            shape.setColor(getThemedColor(Theme.key_dialogBackground));
         } else if (currentStyle == STYLE_BLACK) {
             shape.setColor(0xf9222222);
         } else if (currentStyle == STYLE_THEME) {
-            shape.setColor(Theme.getColor(Theme.key_windowBackgroundWhite));
+            shape.setColor(getThemedColor(Theme.key_windowBackgroundWhite));
         }
         contentContainer.setBackgroundDrawable(shape);
         contentContainer.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         contentContainer.setClipToOutline(true);
         return contentContainer;
+    }
+
+    private int getThemedColor(String key) {
+        Integer color = resourcesProvider != null ? resourcesProvider.getColor(key) : null;
+        return color != null ? color : Theme.getColor(key);
     }
 
     private static PopupWindow createPopupWindow(ViewGroup content) {

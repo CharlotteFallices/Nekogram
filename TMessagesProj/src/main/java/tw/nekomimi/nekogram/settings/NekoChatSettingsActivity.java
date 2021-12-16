@@ -4,14 +4,18 @@ import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.os.Bundle;
 import android.text.TextPaint;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.accessibility.AccessibilityEvent;
+import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 
 import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.DefaultItemAnimator;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -34,24 +38,22 @@ import org.telegram.ui.Cells.TextCheckCell;
 import org.telegram.ui.Cells.TextDetailSettingsCell;
 import org.telegram.ui.Cells.TextInfoPrivacyCell;
 import org.telegram.ui.Cells.TextSettingsCell;
+import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.RecyclerListView;
 import org.telegram.ui.Components.SeekBarView;
-import org.telegram.ui.Components.UndoView;
 
 import java.util.ArrayList;
 
 import tw.nekomimi.nekogram.NekoConfig;
-import tw.nekomimi.nekogram.helpers.AnalyticsHelper;
 import tw.nekomimi.nekogram.helpers.PopupHelper;
 
-@SuppressLint("RtlHardcoded")
+@SuppressLint({"RtlHardcoded", "NotifyDataSetChanged"})
 public class NekoChatSettingsActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate {
 
     private RecyclerListView listView;
     private ListAdapter listAdapter;
-    private ActionBarMenuItem menuItem;
-    private StickerSizeCell stickerSizeCell;
+    private ActionBarMenuItem resetItem;
 
     private int rowCount;
 
@@ -68,6 +70,8 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
     private int tryToOpenAllLinksInIVRow;
     private int disableProximityEventsRow;
     private int swipeToPiPRow;
+    private int disableJumpToNextRow;
+    private int disableGreetingStickerRow;
     private int autoPauseVideoRow;
     private int messageMenuRow;
     private int chat2Row;
@@ -78,19 +82,16 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
     private int tabsTitleTypeRow;
     private int folders2Row;
 
-    private UndoView restartTooltip;
-
     @Override
     public boolean onFragmentCreate() {
         super.onFragmentCreate();
 
-        NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.emojiDidLoad);
+        NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.emojiLoaded);
         updateRows();
 
         return true;
     }
 
-    @SuppressLint("NewApi")
     @Override
     public View createView(Context context) {
         actionBar.setBackButtonImage(R.drawable.ic_ab_back);
@@ -101,20 +102,21 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
         }
 
         ActionBarMenu menu = actionBar.createMenu();
-        menuItem = menu.addItem(0, R.drawable.ic_ab_other);
-        menuItem.setContentDescription(LocaleController.getString("AccDescrMoreOptions", R.string.AccDescrMoreOptions));
-        menuItem.addSubItem(1, R.drawable.msg_reset, LocaleController.getString("ResetStickerSize", R.string.ResetStickerSize));
-        menuItem.setVisibility(NekoConfig.stickerSize != 14.0f ? View.VISIBLE : View.GONE);
+        resetItem = menu.addItem(0, R.drawable.msg_reset);
+        resetItem.setContentDescription(LocaleController.getString("ResetStickerSize", R.string.ResetStickerSize));
+        resetItem.setVisibility(NekoConfig.stickerSize != 14.0f ? View.VISIBLE : View.GONE);
+        resetItem.setTag(null);
+        resetItem.setOnClickListener(v -> {
+            NekoConfig.setStickerSize(14.0f);
+            AndroidUtilities.updateViewVisibilityAnimated(resetItem, false, 0.5f, true);
+            listAdapter.notifyItemChanged(stickerSizeRow, new Object());
+        });
 
         actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
             @Override
             public void onItemClick(int id) {
                 if (id == -1) {
                     finishFragment();
-                } else if (id == 1) {
-                    NekoConfig.setStickerSize(14.0f);
-                    menuItem.setVisibility(View.GONE);
-                    stickerSizeCell.invalidate();
                 }
             }
         });
@@ -126,17 +128,11 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
         FrameLayout frameLayout = (FrameLayout) fragmentView;
 
         listView = new RecyclerListView(context);
-        listView.setLayoutManager(new LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false) {
-            @Override
-            public boolean supportsPredictiveItemAnimations() {
-                return false;
-            }
-        });
+        listView.setLayoutManager(new LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false));
         listView.setVerticalScrollBarEnabled(false);
-        listView.setItemAnimator(null);
-        listView.setLayoutAnimation(null);
-        frameLayout.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.TOP | Gravity.LEFT));
         listView.setAdapter(listAdapter);
+        ((DefaultItemAnimator) listView.getItemAnimator()).setDelayAnimations(false);
+        frameLayout.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
         listView.setOnItemClickListener((view, position, x, y) -> {
             if (position == ignoreBlockedRow) {
                 NekoConfig.toggleIgnoreBlocked();
@@ -195,7 +191,7 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
                 if (view instanceof TextCheckCell) {
                     ((TextCheckCell) view).setChecked(NekoConfig.disableProximityEvents);
                 }
-                restartTooltip.showWithAction(0, UndoView.ACTION_CACHE_WAS_CLEARED, null, null);
+                BulletinFactory.of(this).createSimpleBulletin(R.raw.chats_infotip, LocaleController.formatString("RestartAppToTakeEffect", R.string.RestartAppToTakeEffect)).show();
             } else if (position == tryToOpenAllLinksInIVRow) {
                 NekoConfig.toggleTryToOpenAllLinksInIV();
                 if (view instanceof TextCheckCell) {
@@ -211,12 +207,18 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
                 if (view instanceof TextCheckCell) {
                     ((TextCheckCell) view).setChecked(NekoConfig.autoPauseVideo);
                 }
+            } else if (position == disableJumpToNextRow) {
+                NekoConfig.toggleDisableJumpToNextChannel();
+                if (view instanceof TextCheckCell) {
+                    ((TextCheckCell) view).setChecked(NekoConfig.disableJumpToNextChannel);
+                }
+            } else if (position == disableGreetingStickerRow) {
+                NekoConfig.toggleDisableGreetingSticker();
+                if (view instanceof TextCheckCell) {
+                    ((TextCheckCell) view).setChecked(NekoConfig.disableGreetingSticker);
+                }
             }
         });
-
-        restartTooltip = new UndoView(context);
-        restartTooltip.setInfoText(LocaleController.formatString("RestartAppToTakeEffect", R.string.RestartAppToTakeEffect));
-        frameLayout.addView(restartTooltip, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.LEFT, 8, 0, 8, 8));
 
         return fragmentView;
     }
@@ -236,7 +238,7 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
         stickerSize2Row = rowCount++;
 
         chatRow = rowCount++;
-        ignoreBlockedRow = !AnalyticsHelper.GOOGLE_PLAY || NekoConfig.showHiddenFeature ? rowCount++ : -1;
+        ignoreBlockedRow = rowCount++;
         disablePhotoSideActionRow = rowCount++;
         hideKeyboardOnChatScrollRow = rowCount++;
         rearVideoMessagesRow = rowCount++;
@@ -244,6 +246,8 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
         tryToOpenAllLinksInIVRow = rowCount++;
         disableProximityEventsRow = rowCount++;
         swipeToPiPRow = rowCount++;
+        disableJumpToNextRow = rowCount++;
+        disableGreetingStickerRow = rowCount++;
         autoPauseVideoRow = rowCount++;
         messageMenuRow = rowCount++;
         chat2Row = rowCount++;
@@ -435,7 +439,7 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
 
     @Override
     public void didReceivedNotification(int id, int account, Object... args) {
-        if (id == NotificationCenter.emojiDidLoad) {
+        if (id == NotificationCenter.emojiLoaded) {
             if (listView != null) {
                 listView.invalidateViews();
             }
@@ -445,7 +449,7 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
     @Override
     public void onFragmentDestroy() {
         super.onFragmentDestroy();
-        NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.emojiDidLoad);
+        NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.emojiLoaded);
     }
 
     private class StickerSizeCell extends FrameLayout {
@@ -456,6 +460,7 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
         private final int endStickerSize = 20;
 
         private final TextPaint textPaint;
+        private int lastWidth;
 
         public StickerSizeCell(Context context) {
             super(context);
@@ -470,9 +475,12 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
             sizeBar.setDelegate(new SeekBarView.SeekBarViewDelegate() {
                 @Override
                 public void onSeekBarDrag(boolean stop, float progress) {
+                    sizeBar.getSeekBarAccessibilityDelegate().postAccessibilityEventRunnable(StickerSizeCell.this);
                     NekoConfig.setStickerSize(startStickerSize + (endStickerSize - startStickerSize) * progress);
                     StickerSizeCell.this.invalidate();
-                    menuItem.setVisibility(View.VISIBLE);
+                    if (resetItem.getVisibility() != VISIBLE) {
+                        AndroidUtilities.updateViewVisibilityAnimated(resetItem, true, 0.5f, true);
+                    }
                 }
 
                 @Override
@@ -480,9 +488,11 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
 
                 }
             });
+            sizeBar.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
             addView(sizeBar, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 38, Gravity.LEFT | Gravity.TOP, 9, 5, 43, 11));
 
             messagesCell = new StickerSizePreviewMessagesCell(context, parentLayout);
+            messagesCell.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
             addView(messagesCell, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.LEFT | Gravity.TOP, 0, 53, 0, 0));
         }
 
@@ -495,7 +505,11 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
         @Override
         protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
             super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-            sizeBar.setProgress((NekoConfig.stickerSize - startStickerSize) / (float) (endStickerSize - startStickerSize));
+            int width = MeasureSpec.getSize(widthMeasureSpec);
+            if (lastWidth != width) {
+                sizeBar.setProgress((NekoConfig.stickerSize - startStickerSize) / (float) (endStickerSize - startStickerSize));
+                lastWidth = width;
+            }
         }
 
         @Override
@@ -503,6 +517,23 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
             super.invalidate();
             messagesCell.invalidate();
             sizeBar.invalidate();
+        }
+
+        @Override
+        public void onInitializeAccessibilityEvent(AccessibilityEvent event) {
+            super.onInitializeAccessibilityEvent(event);
+            sizeBar.getSeekBarAccessibilityDelegate().onInitializeAccessibilityEvent(this, event);
+        }
+
+        @Override
+        public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
+            super.onInitializeAccessibilityNodeInfo(info);
+            sizeBar.getSeekBarAccessibilityDelegate().onInitializeAccessibilityNodeInfoInternal(this, info);
+        }
+
+        @Override
+        public boolean performAccessibilityAction(int action, Bundle arguments) {
+            return super.performAccessibilityAction(action, arguments) || sizeBar.getSeekBarAccessibilityDelegate().performAccessibilityActionInternal(this, action, arguments);
         }
     }
 
@@ -575,6 +606,10 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
                         textCell.setTextAndCheck(LocaleController.getString("SwipeToPiP", R.string.SwipeToPiP), NekoConfig.swipeToPiP, true);
                     } else if (position == autoPauseVideoRow) {
                         textCell.setTextAndValueAndCheck(LocaleController.getString("AutoPauseVideo", R.string.AutoPauseVideo), LocaleController.getString("AutoPauseVideoAbout", R.string.AutoPauseVideoAbout), NekoConfig.autoPauseVideo, true, true);
+                    } else if (position == disableJumpToNextRow) {
+                        textCell.setTextAndCheck(LocaleController.getString("DisableJumpToNextChannel", R.string.DisableJumpToNextChannel), NekoConfig.disableJumpToNextChannel, true);
+                    } else if (position == disableGreetingStickerRow) {
+                        textCell.setTextAndCheck(LocaleController.getString("DisableGreetingSticker", R.string.DisableGreetingSticker), NekoConfig.disableGreetingSticker, true);
                     }
                     break;
                 }
@@ -639,7 +674,7 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
                     view.setBackground(Theme.getThemedDrawable(mContext, R.drawable.greydivider, Theme.key_windowBackgroundGrayShadow));
                     break;
                 case 8:
-                    view = stickerSizeCell = new StickerSizeCell(mContext);
+                    view = new StickerSizeCell(mContext);
                     view.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
                     break;
             }

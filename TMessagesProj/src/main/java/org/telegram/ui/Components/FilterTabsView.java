@@ -59,8 +59,6 @@ import tw.nekomimi.nekogram.NekoConfig;
 
 public class FilterTabsView extends FrameLayout {
 
-    private final ItemTouchHelper itemTouchHelper;
-
     public interface FilterTabsViewDelegate {
         void onPageSelected(int page, boolean forward);
         void onPageScrolled(float progress);
@@ -178,6 +176,24 @@ public class FilterTabsView extends FrameLayout {
 
         public int getId() {
             return currentTab.id;
+        }
+
+        @Override
+        protected void onDetachedFromWindow() {
+            super.onDetachedFromWindow();
+            animateChange = false;
+            animateTabCounter = false;
+            animateCounterChange = false;
+            animateTextChange = false;
+            animateTextX = false;
+            animateTabWidth = false;
+            if (changeAnimator != null) {
+                changeAnimator.removeAllListeners();
+                changeAnimator.removeAllUpdateListeners();
+                changeAnimator.cancel();
+                changeAnimator = null;
+            }
+            invalidate();
         }
 
         @Override
@@ -558,12 +574,24 @@ public class FilterTabsView extends FrameLayout {
         @Override
         public void onInitializeAccessibilityNodeInfo(AccessibilityNodeInfo info) {
             super.onInitializeAccessibilityNodeInfo(info);
+            info.setSelected(currentTab != null && selectedTabId != -1 && currentTab.id == selectedTabId);
             info.addAction(AccessibilityNodeInfo.ACTION_CLICK);
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 info.addAction(new AccessibilityNodeInfo.AccessibilityAction(AccessibilityNodeInfo.ACTION_LONG_CLICK, LocaleController.getString("AccDescrOpenMenu2", R.string.AccDescrOpenMenu2)));
             } else {
                 info.addAction(AccessibilityNodeInfo.ACTION_LONG_CLICK);
             }
+        }
+
+        public void clearTransitionParams() {
+            animateChange = false;
+            animateTabCounter = false;
+            animateCounterChange = false;
+            animateTextChange = false;
+            animateTextX = false;
+            animateTabWidth = false;
+            changeAnimator = null;
+            invalidate();
         }
     }
 
@@ -788,6 +816,7 @@ public class FilterTabsView extends FrameLayout {
                     if (tabView.animateChange) {
                         if (tabView.changeAnimator != null) {
                             tabView.changeAnimator.removeAllListeners();
+                            tabView.changeAnimator.removeAllUpdateListeners();
                             tabView.changeAnimator.cancel();
                         }
                         ValueAnimator valueAnimator = ValueAnimator.ofFloat(0, 1f);
@@ -798,14 +827,7 @@ public class FilterTabsView extends FrameLayout {
                         valueAnimator.addListener(new AnimatorListenerAdapter() {
                             @Override
                             public void onAnimationEnd(Animator animation) {
-                                tabView.animateChange = false;
-                                tabView.animateTabCounter = false;
-                                tabView.animateCounterChange = false;
-                                tabView.animateTextChange = false;
-                                tabView.animateTextX = false;
-                                tabView.animateTabWidth = false;
-                                tabView.changeAnimator = null;
-                                tabView.invalidate();
+                                tabView.clearTransitionParams();
                             }
                         });
                         tabView.changeAnimator = valueAnimator;
@@ -819,6 +841,18 @@ public class FilterTabsView extends FrameLayout {
             public void onMoveFinished(RecyclerView.ViewHolder item) {
                 super.onMoveFinished(item);
                 item.itemView.setTranslationX(0);
+                if (item.itemView instanceof TabView) {
+                    ((TabView) item.itemView).clearTransitionParams();
+                }
+            }
+
+            @Override
+            public void endAnimation(RecyclerView.ViewHolder item) {
+                super.endAnimation(item);
+                item.itemView.setTranslationX(0);
+                if (item.itemView instanceof TabView) {
+                    ((TabView) item.itemView).clearTransitionParams();
+                }
             }
         };
         itemAnimator.setDelayAnimations(false);
@@ -864,7 +898,7 @@ public class FilterTabsView extends FrameLayout {
                 return super.scrollHorizontallyBy(dx, recycler, state);
             }
         });
-        itemTouchHelper = new ItemTouchHelper(new TouchHelperCallback());
+        ItemTouchHelper itemTouchHelper = new ItemTouchHelper(new TouchHelperCallback());
         itemTouchHelper.attachToRecyclerView(listView);
         listView.setPadding(AndroidUtilities.dp(7), 0, AndroidUtilities.dp(7), 0);
         listView.setClipToPadding(false);
@@ -1102,8 +1136,12 @@ public class FilterTabsView extends FrameLayout {
                 }
             }
             if (indicatorWidth != 0) {
+                canvas.save();
+                canvas.translate(listView.getTranslationX(), 0);
+                canvas.scale(listView.getScaleX(), 1f, listView.getPivotX() + listView.getX(), listView.getPivotY());
                 selectorDrawable.setBounds((int) indicatorX, height - AndroidUtilities.dpr(4), (int) (indicatorX + indicatorWidth), height);
                 selectorDrawable.draw(canvas);
+                canvas.restore();
             }
         }
         long newTime = SystemClock.elapsedRealtime();
@@ -1172,7 +1210,10 @@ public class FilterTabsView extends FrameLayout {
             additionalTabWidth = trueTabsWidth < width ? (width - trueTabsWidth) / tabs.size() : 0;
             if (prevWidth != additionalTabWidth) {
                 ignoreLayout = true;
+                RecyclerView.ItemAnimator animator = listView.getItemAnimator();
+                listView.setItemAnimator(null);
                 adapter.notifyDataSetChanged();
+                listView.setItemAnimator(animator);
                 ignoreLayout = false;
             }
             updateTabsWidths();
@@ -1303,7 +1344,7 @@ public class FilterTabsView extends FrameLayout {
         boolean changed = false;
         for (int a = 0, N = tabs.size(); a < N; a++) {
             Tab tab = tabs.get(a);
-            if (tab.counter == delegate.getTabCounter(tab.id)) {
+            if (tab.counter == delegate.getTabCounter(tab.id) || delegate.getTabCounter(tab.id) < 0) {
                 continue;
             }
             changed = true;
@@ -1332,7 +1373,7 @@ public class FilterTabsView extends FrameLayout {
             return;
         }
         Tab tab = tabs.get(position);
-        if (tab.counter == delegate.getTabCounter(tab.id)) {
+        if (tab.counter == delegate.getTabCounter(tab.id) || delegate.getTabCounter(tab.id) < 0) {
             return;
         }
         listView.invalidateViews();
@@ -1497,5 +1538,9 @@ public class FilterTabsView extends FrameLayout {
             viewHolder.itemView.setPressed(false);
             viewHolder.itemView.setBackground(null);
         }
+    }
+
+    public RecyclerListView getListView() {
+        return listView;
     }
 }

@@ -14,6 +14,8 @@ import android.os.IBinder;
 import androidx.core.app.NotificationCompat;
 import androidx.core.app.NotificationManagerCompat;
 
+import tw.nekomimi.nekogram.NekoConfig;
+
 public class VideoEncodingService extends Service implements NotificationCenter.NotificationCenterDelegate {
 
     private NotificationCompat.Builder builder;
@@ -39,7 +41,7 @@ public class VideoEncodingService extends Service implements NotificationCenter.
         }
         NotificationManagerCompat.from(ApplicationLoader.applicationContext).cancel(4);
         NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.stopEncodingService);
-        NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.FileUploadProgressChanged);
+        NotificationCenter.getInstance(currentAccount).removeObserver(this, NotificationCenter.fileUploadProgressChanged);
         if (BuildVars.LOGS_ENABLED) {
             FileLog.d("destroy video service");
         }
@@ -47,7 +49,7 @@ public class VideoEncodingService extends Service implements NotificationCenter.
 
     @Override
     public void didReceivedNotification(int id, int account, Object... args) {
-        if (id == NotificationCenter.FileUploadProgressChanged) {
+        if (id == NotificationCenter.fileUploadProgressChanged) {
             String fileName = (String) args[0];
             if (account == currentAccount && path != null && path.equals(fileName)) {
                 Long loadedSize = (Long) args[1];
@@ -75,9 +77,13 @@ public class VideoEncodingService extends Service implements NotificationCenter.
         path = intent.getStringExtra("path");
         int oldAccount = currentAccount;
         currentAccount = intent.getIntExtra("currentAccount", UserConfig.selectedAccount);
+        if (!UserConfig.isValidAccount(currentAccount)) {
+            stopSelf();
+            return Service.START_NOT_STICKY;
+        }
         if (oldAccount != currentAccount) {
-            NotificationCenter.getInstance(oldAccount).removeObserver(this, NotificationCenter.FileUploadProgressChanged);
-            NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.FileUploadProgressChanged);
+            NotificationCenter.getInstance(oldAccount).removeObserver(this, NotificationCenter.fileUploadProgressChanged);
+            NotificationCenter.getInstance(currentAccount).addObserver(this, NotificationCenter.fileUploadProgressChanged);
         }
         boolean isGif = intent.getBooleanExtra("gif", false);
         if (path == null) {
@@ -93,7 +99,8 @@ public class VideoEncodingService extends Service implements NotificationCenter.
             builder.setSmallIcon(android.R.drawable.stat_sys_upload);
             builder.setWhen(System.currentTimeMillis());
             builder.setChannelId(NotificationsController.OTHER_NOTIFICATIONS_CHANNEL);
-            builder.setContentTitle(LocaleController.getString("Nekogram", R.string.Nekogram));
+            builder.setContentTitle(LocaleController.getString("AppName", R.string.AppName));
+            builder.setColor(NekoConfig.getNotificationColor());
             if (isGif) {
                 builder.setTicker(LocaleController.getString("SendingGif", R.string.SendingGif));
                 builder.setContentText(LocaleController.getString("SendingGif", R.string.SendingGif));
@@ -103,7 +110,7 @@ public class VideoEncodingService extends Service implements NotificationCenter.
             }
         }
         currentProgress = 0;
-        builder.setProgress(100, currentProgress, currentProgress == 0);
+        builder.setProgress(100, currentProgress, true);
         startForeground(4, builder.build());
         NotificationManagerCompat.from(ApplicationLoader.applicationContext).notify(4, builder.build());
         return Service.START_NOT_STICKY;

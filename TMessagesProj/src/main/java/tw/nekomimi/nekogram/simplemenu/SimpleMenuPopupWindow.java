@@ -1,16 +1,15 @@
 package tw.nekomimi.nekogram.simplemenu;
 
-import android.annotation.SuppressLint;
+import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
+
 import android.content.Context;
 import android.graphics.Outline;
 import android.graphics.Paint;
-import android.graphics.PorterDuff;
-import android.graphics.PorterDuffColorFilter;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Build;
 import android.view.Gravity;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewOutlineProvider;
 import android.widget.PopupWindow;
@@ -24,10 +23,9 @@ import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.Components.RecyclerListView;
 
 import java.util.Arrays;
-
-import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 /**
  * Extension of {@link PopupWindow} that implements
@@ -63,23 +61,27 @@ public class SimpleMenuPopupWindow extends PopupWindow {
         setFocusable(true);
         setOutsideTouchable(false);
 
-        elevation[POPUP_MENU] = AndroidUtilities.dp(8);
-        elevation[DIALOG] = AndroidUtilities.dp(48);
-        margin[POPUP_MENU][HORIZONTAL] = AndroidUtilities.isTablet() ? AndroidUtilities.dp(23) : AndroidUtilities.dp(15);
-        margin[POPUP_MENU][VERTICAL] = AndroidUtilities.dp(16);
-        margin[DIALOG][HORIZONTAL] = AndroidUtilities.dp(16);
-        margin[DIALOG][VERTICAL] = AndroidUtilities.dp(24);
-        listPadding[POPUP_MENU][HORIZONTAL] = AndroidUtilities.dp(24);
-        listPadding[DIALOG][HORIZONTAL] = AndroidUtilities.dp(24);
-        dialogMaxWidth = AndroidUtilities.dp(600);
-        unit = AndroidUtilities.dp(56);
+        elevation[POPUP_MENU] = (int) AndroidUtilities.dpf2(8);
+        elevation[DIALOG] = (int) AndroidUtilities.dpf2(24);
+        margin[POPUP_MENU][HORIZONTAL] = (int) (AndroidUtilities.isTablet() ? AndroidUtilities.dpf2(23) : AndroidUtilities.dpf2(15));
+        margin[POPUP_MENU][VERTICAL] = (int) AndroidUtilities.dpf2(8);
+        margin[DIALOG][HORIZONTAL] = (int) AndroidUtilities.dpf2(16);
+        margin[DIALOG][VERTICAL] = (int) AndroidUtilities.dpf2(24);
+        listPadding[POPUP_MENU][HORIZONTAL] = (int) AndroidUtilities.dpf2(16);
+        listPadding[DIALOG][HORIZONTAL] = (int) AndroidUtilities.dpf2(24);
+        dialogMaxWidth = (int) AndroidUtilities.dpf2(600);
+        unit = (int) AndroidUtilities.dpf2(56);
         maxUnits = AndroidUtilities.isTablet() ? 7 : 5;
 
-        Drawable backgroundDrawable = context.getResources().getDrawable(R.drawable.simple_menu_background).mutate();
-        backgroundDrawable.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_actionBarDefaultSubmenuBackground), PorterDuff.Mode.MULTIPLY));
+        GradientDrawable backgroundDrawable = new GradientDrawable();
+        backgroundDrawable.setCornerRadius(AndroidUtilities.dp(4));
+        backgroundDrawable.setColor(Theme.getColor(Theme.key_actionBarDefaultSubmenuBackground));
         setBackgroundDrawable(backgroundDrawable);
 
-        @SuppressLint("InflateParams") RecyclerView mList = (RecyclerView) LayoutInflater.from(context).inflate(R.layout.simple_menu_list, null);
+        RecyclerListView mList = new RecyclerListView(context);
+        mList.setPadding(0, AndroidUtilities.dp(8), 0, AndroidUtilities.dp(8));
+        mList.setScrollBarStyle(View.SCROLLBARS_OUTSIDE_OVERLAY);
+        mList.setVerticalScrollBarEnabled(true);
         mList.setFocusable(true);
         mList.setLayoutManager(new LinearLayoutManager(context));
         mList.setItemAnimator(null);
@@ -89,7 +91,15 @@ public class SimpleMenuPopupWindow extends PopupWindow {
                 getBackground().getOutline(outline);
             }
         });
+        mList.setClipToPadding(false);
         mList.setClipToOutline(true);
+        mList.setOnItemClickListener((view, position) -> {
+            mOnItemClickListener.onClick(position);
+
+            if (isShowing()) {
+                dismiss();
+            }
+        });
 
         setContentView(mList);
 
@@ -97,8 +107,8 @@ public class SimpleMenuPopupWindow extends PopupWindow {
         mList.setAdapter(mAdapter);
 
         // TODO do not hardcode
-        itemHeight = Math.round(context.getResources().getDisplayMetrics().density * 48);
-        listPadding[POPUP_MENU][VERTICAL] = listPadding[DIALOG][VERTICAL] = Math.round(context.getResources().getDisplayMetrics().density * 8);
+        itemHeight = AndroidUtilities.dpr(48);
+        listPadding[POPUP_MENU][VERTICAL] = listPadding[DIALOG][VERTICAL] = AndroidUtilities.dpr(8);
     }
 
     public OnItemClickListener getOnItemClickListener() {
@@ -363,7 +373,7 @@ public class SimpleMenuPopupWindow extends PopupWindow {
 
         Rect bounds = new Rect();
 
-        @SuppressLint("InflateParams") TextView view = LayoutInflater.from(context).inflate(R.layout.simple_menu_item, null, false).findViewById(android.R.id.text1);
+        TextView view = new SimpleMenuItem(context);
         Paint textPaint = view.getPaint();
 
         for (CharSequence chs : entries) {

@@ -11,6 +11,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 
 import androidx.annotation.NonNull;
 import androidx.core.content.FileProvider;
@@ -21,13 +22,13 @@ import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.BuildConfig;
 import org.telegram.messenger.ContactsController;
 import org.telegram.messenger.FileLoader;
-import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.ActionBar;
+import org.telegram.ui.ActionBar.AlertDialog;
 import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.ActionBar.ThemeDescription;
@@ -38,15 +39,17 @@ import org.telegram.ui.Cells.ShadowSectionCell;
 import org.telegram.ui.Cells.TextCheckCell;
 import org.telegram.ui.Cells.TextDetailSettingsCell;
 import org.telegram.ui.Cells.TextSettingsCell;
+import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.RecyclerListView;
-import org.telegram.ui.Components.UndoView;
 import org.telegram.ui.ProfileActivity;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Locale;
 
+@SuppressLint({"RtlHardcoded", "NotifyDataSetChanged"})
 public class MessageDetailsActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate {
 
     private RecyclerListView listView;
@@ -77,9 +80,10 @@ public class MessageDetailsActivity extends BaseFragment implements Notification
     private int filePathRow;
     private int fileSizeRow;
     private int dcRow;
+    private int restrictionReasonRow;
+    private int forwardsRow;
+    private int sponsoredRow;
     private int endRow;
-
-    private UndoView copyTooltip;
 
     public MessageDetailsActivity(MessageObject messageObject) {
         this.messageObject = messageObject;
@@ -147,7 +151,7 @@ public class MessageDetailsActivity extends BaseFragment implements Notification
     public boolean onFragmentCreate() {
         super.onFragmentCreate();
 
-        NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.emojiDidLoad);
+        NotificationCenter.getGlobalInstance().addObserver(this, NotificationCenter.emojiLoaded);
         updateRows();
 
         return true;
@@ -184,19 +188,29 @@ public class MessageDetailsActivity extends BaseFragment implements Notification
         listView.setAdapter(listAdapter);
         listView.setOnItemClickListener((view, position, x, y) -> {
             if (position != endRow) {
-                TextDetailSettingsCell textCell = (TextDetailSettingsCell) view;
-                try {
+                if (getMessagesController().isChatNoForwards(toChat) && (position == messageRow || position == captionRow)) {
+                    if (toChat.broadcast) {
+                        BulletinFactory.of(this).createErrorBulletin(LocaleController.getString("ForwardsRestrictedInfoChannel", R.string.ForwardsRestrictedInfoChannel)).show();
+                    } else {
+                        BulletinFactory.of(this).createErrorBulletin(LocaleController.getString("ForwardsRestrictedInfoGroup", R.string.ForwardsRestrictedInfoGroup)).show();
+                    }
+                } else {
+                    TextDetailSettingsCell textCell = (TextDetailSettingsCell) view;
                     AndroidUtilities.addToClipboard(textCell.getValueTextView().getText());
-                    copyTooltip.showWithAction(0, UndoView.ACTION_CACHE_WAS_CLEARED, null, null);
-                } catch (Exception e) {
-                    FileLog.e(e);
+                    BulletinFactory.of(this).createCopyBulletin(LocaleController.formatString("TextCopied", R.string.TextCopied)).show();
                 }
             }
 
         });
         listView.setOnItemLongClickListener((view, position) -> {
             if (position == filePathRow) {
-                AndroidUtilities.runOnUIThread(() -> {
+                if (getMessagesController().isChatNoForwards(toChat)) {
+                    if (toChat.broadcast) {
+                        BulletinFactory.of(this).createErrorBulletin(LocaleController.getString("ForwardsRestrictedInfoChannel", R.string.ForwardsRestrictedInfoChannel)).show();
+                    } else {
+                        BulletinFactory.of(this).createErrorBulletin(LocaleController.getString("ForwardsRestrictedInfoGroup", R.string.ForwardsRestrictedInfoGroup)).show();
+                    }
+                } else {
                     Intent intent = new Intent(Intent.ACTION_SEND);
                     intent.setType("application/octet-stream");
                     if (Build.VERSION.SDK_INT >= 24) {
@@ -210,47 +224,67 @@ public class MessageDetailsActivity extends BaseFragment implements Notification
                         intent.putExtra(Intent.EXTRA_STREAM, Uri.fromFile(new File(filePath)));
                     }
                     startActivityForResult(Intent.createChooser(intent, LocaleController.getString("ShareFile", R.string.ShareFile)), 500);
-                });
+                }
             } else if (position == channelRow || position == groupRow) {
                 if (toChat != null) {
                     Bundle args = new Bundle();
-                    args.putInt("chat_id", toChat.id);
+                    args.putLong("chat_id", toChat.id);
                     ProfileActivity fragment = new ProfileActivity(args);
                     presentFragment(fragment);
                 }
             } else if (position == fromRow) {
                 if (fromUser != null) {
                     Bundle args = new Bundle();
-                    args.putInt("user_id", fromUser.id);
+                    args.putLong("user_id", fromUser.id);
                     ProfileActivity fragment = new ProfileActivity(args);
                     presentFragment(fragment);
                 } else if (fromChat != null) {
                     Bundle args = new Bundle();
-                    args.putInt("chat_id", fromChat.id);
+                    args.putLong("chat_id", fromChat.id);
                     ProfileActivity fragment = new ProfileActivity(args);
                     presentFragment(fragment);
                 }
             } else if (position == forwardRow) {
                 if (forwardFromUser != null) {
                     Bundle args = new Bundle();
-                    args.putInt("user_id", forwardFromUser.id);
+                    args.putLong("user_id", forwardFromUser.id);
                     ProfileActivity fragment = new ProfileActivity(args);
                     presentFragment(fragment);
                 } else if (forwardFromChat != null) {
                     Bundle args = new Bundle();
-                    args.putInt("chat_id", forwardFromChat.id);
+                    args.putLong("chat_id", forwardFromChat.id);
                     ProfileActivity fragment = new ProfileActivity(args);
                     presentFragment(fragment);
                 }
+            } else if (position == restrictionReasonRow) {
+                ArrayList<TLRPC.TL_restrictionReason> reasons = messageObject.messageOwner.restriction_reason;
+                LinearLayout ll = new LinearLayout(context);
+                ll.setOrientation(LinearLayout.VERTICAL);
+
+                AlertDialog dialog = new AlertDialog.Builder(context)
+                        .setView(ll)
+                        .create();
+
+                for (TLRPC.TL_restrictionReason reason : reasons) {
+                    TextDetailSettingsCell cell = new TextDetailSettingsCell(context);
+                    cell.setBackground(Theme.getSelectorDrawable(false));
+                    cell.setMultilineDetail(true);
+                    cell.setOnClickListener(v1 -> {
+                        dialog.dismiss();
+                        AndroidUtilities.addToClipboard(cell.getValueTextView().getText());
+                        BulletinFactory.of(this).createCopyBulletin(LocaleController.formatString("TextCopied", R.string.TextCopied)).show();
+                    });
+                    cell.setTextAndValue(reason.reason + "-" + reason.platform, reason.text, false);
+
+                    ll.addView(cell, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
+                }
+
+                showDialog(dialog);
             } else {
                 return false;
             }
             return true;
         });
-
-        copyTooltip = new UndoView(context);
-        copyTooltip.setInfoText(LocaleController.getString("TextCopied", R.string.TextCopied));
-        frameLayout.addView(copyTooltip, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.LEFT, 8, 0, 8, 8));
 
         return fragmentView;
     }
@@ -265,7 +299,7 @@ public class MessageDetailsActivity extends BaseFragment implements Notification
 
     private void updateRows() {
         rowCount = 0;
-        idRow = rowCount++;
+        idRow = messageObject.isSponsored() ? -1 : rowCount++;
         messageRow = TextUtils.isEmpty(messageObject.messageText) ? -1 : rowCount++;
         captionRow = TextUtils.isEmpty(messageObject.caption) ? -1 : rowCount++;
         groupRow = toChat != null && !toChat.broadcast ? rowCount++ : -1;
@@ -286,6 +320,9 @@ public class MessageDetailsActivity extends BaseFragment implements Notification
         } else {
             dcRow = -1;
         }
+        restrictionReasonRow = messageObject.messageOwner.restriction_reason.isEmpty() ? -1 : rowCount++;
+        forwardsRow = messageObject.messageOwner.forwards > 0 ? rowCount++ : -1;
+        sponsoredRow = messageObject.isSponsored() ? rowCount++ : -1;
         endRow = rowCount++;
         if (listAdapter != null) {
             listAdapter.notifyDataSetChanged();
@@ -335,7 +372,7 @@ public class MessageDetailsActivity extends BaseFragment implements Notification
 
     @Override
     public void didReceivedNotification(int id, int account, Object... args) {
-        if (id == NotificationCenter.emojiDidLoad) {
+        if (id == NotificationCenter.emojiLoaded) {
             if (listView != null) {
                 listView.invalidateViews();
             }
@@ -345,7 +382,7 @@ public class MessageDetailsActivity extends BaseFragment implements Notification
     @Override
     public void onFragmentDestroy() {
         super.onFragmentDestroy();
-        NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.emojiDidLoad);
+        NotificationCenter.getGlobalInstance().removeObserver(this, NotificationCenter.emojiLoaded);
     }
 
     private class ListAdapter extends RecyclerListView.SelectionAdapter {
@@ -466,11 +503,29 @@ public class MessageDetailsActivity extends BaseFragment implements Notification
                     } else if (position == fileSizeRow) {
                         textCell.setTextAndValue("File size", AndroidUtilities.formatFileSize(messageObject.getSize()), divider);
                     } else if (position == dcRow) {
+                        int dc = 0;
                         if (messageObject.messageOwner.media.photo != null && messageObject.messageOwner.media.photo.dc_id > 0) {
-                            textCell.setTextAndValue("DC", String.valueOf(messageObject.messageOwner.media.photo.dc_id), divider);
+                            dc = messageObject.messageOwner.media.photo.dc_id;
                         } else if (messageObject.messageOwner.media.document != null && messageObject.messageOwner.media.document.dc_id > 0) {
-                            textCell.setTextAndValue("DC", String.valueOf(messageObject.messageOwner.media.document.dc_id), divider);
+                            dc = messageObject.messageOwner.media.document.dc_id;
                         }
+                        textCell.setTextAndValue("DC", String.format(Locale.US, "%d, %s", dc, getMessageHelper().getDCLocation(dc)), divider);
+                    } else if (position == restrictionReasonRow) {
+                        ArrayList<TLRPC.TL_restrictionReason> reasons = messageObject.messageOwner.restriction_reason;
+                        StringBuilder value = new StringBuilder();
+                        for (TLRPC.TL_restrictionReason reason : reasons) {
+                            value.append(reason.reason);
+                            value.append("-");
+                            value.append(reason.platform);
+                            if (reasons.indexOf(reason) != reasons.size() - 1) {
+                                value.append(", ");
+                            }
+                        }
+                        textCell.setTextAndValue("Restriction reason", value.toString(), divider);
+                    } else if (position == forwardsRow) {
+                        textCell.setTextAndValue("Forwards", String.format(Locale.US, "%d", messageObject.messageOwner.forwards), divider);
+                    } else if (position == sponsoredRow) {
+                        textCell.setTextAndValue("Sponsored", "Yes", divider);
                     }
                     break;
                 }

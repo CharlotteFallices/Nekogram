@@ -1,47 +1,183 @@
 package tw.nekomimi.nekogram.helpers;
 
+import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.Context;
+import android.content.DialogInterface;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.net.Uri;
 import android.os.Build;
 import android.text.TextUtils;
+import android.util.SparseArray;
+import android.util.TypedValue;
+import android.view.Gravity;
+import android.view.inputmethod.EditorInfo;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
+import com.google.zxing.BarcodeFormat;
+import com.google.zxing.EncodeHintType;
+import com.google.zxing.qrcode.QRCodeWriter;
+import com.google.zxing.qrcode.decoder.ErrorCorrectionLevel;
+
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.telegram.messenger.AndroidUtilities;
-import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.BaseController;
-import org.telegram.messenger.Bitmaps;
+import org.telegram.messenger.ChatObject;
 import org.telegram.messenger.FileLoader;
 import org.telegram.messenger.FileLog;
+import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MediaController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
-import org.telegram.messenger.SharedConfig;
+import org.telegram.messenger.R;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.Utilities;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.TLRPC;
+import org.telegram.ui.ActionBar.AlertDialog;
+import org.telegram.ui.ActionBar.BaseFragment;
+import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.Cells.CheckBoxCell;
+import org.telegram.ui.ChatActivity;
+import org.telegram.ui.Components.AlertsCreator;
+import org.telegram.ui.Components.AvatarDrawable;
+import org.telegram.ui.Components.BackupImageView;
+import org.telegram.ui.Components.BulletinFactory;
+import org.telegram.ui.Components.ChatAttachAlert;
+import org.telegram.ui.Components.EditTextBoldCursor;
+import org.telegram.ui.Components.LayoutHelper;
 
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.InputStream;
-import java.io.RandomAccessFile;
-import java.nio.ByteBuffer;
-import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class MessageHelper extends BaseController {
 
     private static final MessageHelper[] Instance = new MessageHelper[UserConfig.MAX_ACCOUNT_COUNT];
-    private int lastReqId;
 
     public MessageHelper(int num) {
         super(num);
     }
 
-    public boolean saveStickerToGallery(Activity activity, MessageObject messageObject) {
+    public Bitmap createQR(Context context, String key) {
+        try {
+            HashMap<EncodeHintType, Object> hints = new HashMap<>();
+            hints.put(EncodeHintType.ERROR_CORRECTION, ErrorCorrectionLevel.M);
+            hints.put(EncodeHintType.MARGIN, 0);
+            QRCodeWriter writer = new QRCodeWriter();
+            return writer.encode(key, BarcodeFormat.QR_CODE, 768, 768, hints, null, context);
+        } catch (Exception e) {
+            FileLog.e(e);
+        }
+        return null;
+    }
+
+    public String generateUpdateInfo(SparseArray<MessageObject>[] selectedMessagesIds) {
+        ArrayList<MessageObject> messageObjects = new ArrayList<>();
+        for (int a = 1; a >= 0; a--) {
+            for (int b = 0; b < selectedMessagesIds[a].size(); b++) {
+                messageObjects.add(selectedMessagesIds[a].valueAt(b));
+            }
+        }
+        try {
+            JSONObject jsonObject = new JSONObject();
+            jsonObject.put("can_not_skip", false);
+            Pattern regex = Pattern.compile("Nekogram-(.*)-([0-9]+)-(.*)\\.apk");
+            JSONObject file = new JSONObject();
+            JSONObject message = new JSONObject();
+            for (MessageObject messageObject : messageObjects) {
+                if (messageObject.isAnyKindOfSticker()) {
+                    jsonObject.put("sticker", messageObject.getId());
+                } else if (messageObject.getDocument() != null) {
+                    Matcher m = regex.matcher(messageObject.getDocumentName());
+                    if (m.find()) {
+                        if (!jsonObject.has("version")) {
+                            jsonObject.put("version", m.group(1));
+                            jsonObject.put("version_code", m.group(2));
+                        }
+                        String abi = m.group(3);
+                        if (abi != null) file.put(abi, messageObject.getId());
+                    }
+                } else {
+                    if (containsHanScript(messageObject.messageOwner.message)) {
+                        message.put("Zuragram", messageObject.getId());
+                    } else {
+                        message.put("nekoupdates", messageObject.getId());
+                    }
+                }
+            }
+            if (message.length() != 0) {
+                jsonObject.put("messages", message);
+                if (message.has("nekoupdates") && !message.has("Zuragram")) {
+                    message.put("Zuragram", message.getInt("nekoupdates"));
+                }
+            }
+            if (file.length() != 0) {
+                jsonObject.put("files", file);
+            }
+            return UpdateHelper.UPDATE_TAG + jsonObject.toString();
+        } catch (JSONException e) {
+            FileLog.e(e);
+            return "";
+        }
+    }
+
+    public static boolean containsHanScript(String s) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            return s.codePoints().anyMatch(Character::isIdeographic);
+        } else {
+            for (int i = 0; i < s.length(); i++) {
+                if (Character.isIdeographic(s.codePointAt(i))) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    private MessageObject getTargetMessageObjectFromGroup(MessageObject.GroupedMessages selectedObjectGroup) {
+        MessageObject messageObject = null;
+        for (MessageObject object : selectedObjectGroup.messages) {
+            if (!TextUtils.isEmpty(object.messageOwner.message)) {
+                if (messageObject != null) {
+                    messageObject = null;
+                    break;
+                } else {
+                    messageObject = object;
+                }
+            }
+        }
+        return messageObject;
+    }
+
+    public MessageObject getMessageForTranslate(MessageObject selectedObject, MessageObject.GroupedMessages selectedObjectGroup) {
+        MessageObject messageObject = null;
+        if (selectedObjectGroup != null && !selectedObjectGroup.isDocuments) {
+            messageObject = getTargetMessageObjectFromGroup(selectedObjectGroup);
+        } else if (!selectedObject.isAnimatedEmoji() && !TextUtils.isEmpty(selectedObject.messageOwner.message) || selectedObject.type == MessageObject.TYPE_POLL) {
+            messageObject = selectedObject;
+        }
+        return messageObject;
+    }
+
+    public MessageObject getMessageForRepeat(MessageObject selectedObject, MessageObject.GroupedMessages selectedObjectGroup) {
+        MessageObject messageObject = null;
+        if (selectedObjectGroup != null && !selectedObjectGroup.isDocuments) {
+            messageObject = getTargetMessageObjectFromGroup(selectedObjectGroup);
+        } else if (!TextUtils.isEmpty(selectedObject.messageOwner.message) || selectedObject.isAnyKindOfSticker()) {
+            messageObject = selectedObject;
+        }
+        return messageObject;
+    }
+
+    public void saveStickerToGallery(Activity activity, MessageObject messageObject, Runnable callback) {
         String path = messageObject.messageOwner.attachPath;
         if (!TextUtils.isEmpty(path)) {
             File temp = new File(path);
@@ -60,56 +196,37 @@ public class MessageHelper extends BaseController {
             path = FileLoader.getPathToAttach(messageObject.getDocument(), true).toString();
             File temp = new File(path);
             if (!temp.exists()) {
-                return false;
+                return;
             }
         }
-        if (!TextUtils.isEmpty(path)) {
+        saveStickerToGallery(activity, path, callback);
+    }
+
+    public static void saveStickerToGallery(Activity activity, TLRPC.Document document, Runnable callback) {
+        String path = FileLoader.getPathToAttach(document, true).toString();
+        File temp = new File(path);
+        if (!temp.exists()) {
+            return;
+        }
+        saveStickerToGallery(activity, path, callback);
+    }
+
+    private static void saveStickerToGallery(Activity activity, String path, Runnable callback) {
+        Utilities.globalQueue.postRunnable(() -> {
             try {
-                Bitmap image;
-                if (Build.VERSION.SDK_INT >= 19) {
-                    image = BitmapFactory.decodeFile(path);
-                } else {
-                    RandomAccessFile file = new RandomAccessFile(path, "r");
-                    ByteBuffer buffer = file.getChannel().map(FileChannel.MapMode.READ_ONLY, 0, path.length());
-                    BitmapFactory.Options bmOptions = new BitmapFactory.Options();
-                    bmOptions.inJustDecodeBounds = true;
-                    Utilities.loadWebpImage(null, buffer, buffer.limit(), bmOptions, true);
-                    image = Bitmaps.createBitmap(bmOptions.outWidth, bmOptions.outHeight, Bitmap.Config.ARGB_8888);
-                    Utilities.loadWebpImage(image, buffer, buffer.limit(), null, true);
-                    file.close();
-                }
+                Bitmap image = BitmapFactory.decodeFile(path);
                 if (image != null) {
                     File file = new File(path.replace(".webp", ".png"));
                     FileOutputStream stream = new FileOutputStream(file);
                     image.compress(Bitmap.CompressFormat.PNG, 100, stream);
                     stream.close();
                     MediaController.saveFile(file.toString(), activity, 0, null, null);
-                    return true;
+                    AndroidUtilities.runOnUIThread(callback);
                 }
             } catch (Exception e) {
                 FileLog.e(e);
             }
-        }
-        return false;
-    }
-
-    public static String saveUriToCache(Uri uri) {
-        try {
-            InputStream inputStream = ApplicationLoader.applicationContext.getContentResolver().openInputStream(uri);
-            String fileName = Integer.MIN_VALUE + "_" + SharedConfig.getLastLocalId();
-            File fileDir = FileLoader.getDirectory(FileLoader.MEDIA_DIR_CACHE);
-            final File cacheFile = new File(fileDir, fileName);
-            if (inputStream != null) {
-                AndroidUtilities.copyFile(inputStream, cacheFile);
-                SharedConfig.saveConfig();
-                return cacheFile.getAbsolutePath();
-            } else {
-                return null;
-            }
-        } catch (Exception e) {
-            FileLog.e(e);
-            return null;
-        }
+        });
     }
 
     public static MessageHelper getInstance(int num) {
@@ -125,162 +242,247 @@ public class MessageHelper extends BaseController {
         return localInstance;
     }
 
-    public void resetMessageContent(long dialog_id, MessageObject messageObject, boolean translated) {
+    public void createDeleteHistoryAlert(BaseFragment fragment, TLRPC.Chat chat, long mergeDialogId, Theme.ResourcesProvider resourcesProvider) {
+        if (fragment == null || fragment.getParentActivity() == null || chat == null) {
+            return;
+        }
+
+        Context context = fragment.getParentActivity();
+        AlertDialog.Builder builder = new AlertDialog.Builder(context, resourcesProvider);
+
+        CheckBoxCell cell = ChatObject.isChannel(chat) && ChatObject.canUserDoAction(chat, ChatObject.ACTION_DELETE_MESSAGES) ? new CheckBoxCell(context, 1, resourcesProvider) : null;
+
+        TextView messageTextView = new TextView(context);
+        messageTextView.setTextColor(Theme.getColor(Theme.key_dialogTextBlack));
+        messageTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
+        messageTextView.setGravity((LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP);
+
+        FrameLayout frameLayout = new FrameLayout(context) {
+            @Override
+            protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+                super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+                if (cell != null) {
+                    setMeasuredDimension(getMeasuredWidth(), getMeasuredHeight() + cell.getMeasuredHeight() + AndroidUtilities.dp(7));
+                }
+            }
+        };
+        builder.setView(frameLayout);
+
+        AvatarDrawable avatarDrawable = new AvatarDrawable();
+        avatarDrawable.setTextSize(AndroidUtilities.dp(12));
+        avatarDrawable.setInfo(chat);
+
+        BackupImageView imageView = new BackupImageView(context);
+        imageView.setRoundRadius(AndroidUtilities.dp(20));
+        imageView.setForUserOrChat(chat, avatarDrawable);
+        frameLayout.addView(imageView, LayoutHelper.createFrame(40, 40, (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP, 22, 5, 22, 0));
+
+        TextView textView = new TextView(context);
+        textView.setTextColor(Theme.getColor(Theme.key_actionBarDefaultSubmenuItem));
+        textView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 20);
+        textView.setTypeface(AndroidUtilities.getTypeface("fonts/rmedium.ttf"));
+        textView.setLines(1);
+        textView.setMaxLines(1);
+        textView.setSingleLine(true);
+        textView.setGravity((LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.CENTER_VERTICAL);
+        textView.setEllipsize(TextUtils.TruncateAt.END);
+        textView.setText(LocaleController.getString("DeleteAllFromSelf", R.string.DeleteAllFromSelf));
+
+        frameLayout.addView(textView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP, (LocaleController.isRTL ? 21 : 76), 11, (LocaleController.isRTL ? 76 : 21), 0));
+        frameLayout.addView(messageTextView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, (LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP, 24, 57, 24, 9));
+
+        if (cell != null) {
+            boolean sendAs = ChatObject.getSendAsPeerId(chat, getMessagesController().getChatFull(chat.id), true) != getUserConfig().getClientUserId();
+            cell.setBackground(Theme.getSelectorDrawable(false));
+            cell.setText(LocaleController.getString("DeleteAllFromSelfAdmin", R.string.DeleteAllFromSelfAdmin), "", !ChatObject.shouldSendAnonymously(chat) && !sendAs, false);
+            cell.setPadding(LocaleController.isRTL ? AndroidUtilities.dp(16) : AndroidUtilities.dp(8), 0, LocaleController.isRTL ? AndroidUtilities.dp(8) : AndroidUtilities.dp(16), 0);
+            frameLayout.addView(cell, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 48, Gravity.BOTTOM | Gravity.LEFT, 0, 0, 0, 0));
+            cell.setOnClickListener(v -> {
+                CheckBoxCell cell1 = (CheckBoxCell) v;
+                cell1.setChecked(!cell1.isChecked(), true);
+            });
+        }
+
+        messageTextView.setText(AndroidUtilities.replaceTags(LocaleController.getString("DeleteAllFromSelfAlert", R.string.DeleteAllFromSelfAlert)));
+
+        builder.setPositiveButton(LocaleController.getString("DeleteAll", R.string.DeleteAll), (dialogInterface, i) -> {
+            if (cell != null && cell.isChecked()) {
+                getMessagesController().deleteUserChannelHistory(chat, getUserConfig().getCurrentUser(), null, 0);
+            } else {
+                deleteUserChannelHistoryWithSearch(fragment, -chat.id, mergeDialogId);
+            }
+        });
+        builder.setNegativeButton(LocaleController.getString("Cancel", R.string.Cancel), null);
+        AlertDialog alertDialog = builder.create();
+        fragment.showDialog(alertDialog);
+        TextView button = (TextView) alertDialog.getButton(DialogInterface.BUTTON_POSITIVE);
+        if (button != null) {
+            button.setTextColor(Theme.getColor(Theme.key_dialogTextRed2));
+        }
+    }
+
+    public void resetMessageContent(long dialogId, MessageObject messageObject, boolean translated) {
         TLRPC.Message message = messageObject.messageOwner;
 
         MessageObject obj = new MessageObject(currentAccount, message, true, true);
         obj.originalMessage = messageObject.originalMessage;
         obj.translated = translated;
+        if (messageObject.isSponsored()) {
+            obj.sponsoredId = messageObject.sponsoredId;
+            obj.botStartParam = messageObject.botStartParam;
+        }
 
         ArrayList<MessageObject> arrayList = new ArrayList<>();
         arrayList.add(obj);
-        getNotificationCenter().postNotificationName(NotificationCenter.replaceMessagesObjects, dialog_id, arrayList, false);
+        getNotificationCenter().postNotificationName(NotificationCenter.replaceMessagesObjects, dialogId, arrayList, false);
     }
 
-    public void processForwardFromMyName(ArrayList<MessageObject> messages, long did, boolean notify, int scheduleDate) {
-        HashMap<Long, Long> map = new HashMap<>();
-        for (int i = 0; i < messages.size(); i++) {
-            MessageObject messageObject = messages.get(i);
-            ArrayList<TLRPC.MessageEntity> entities;
-            if (messageObject.messageOwner.entities != null && !messageObject.messageOwner.entities.isEmpty()) {
-                entities = new ArrayList<>();
-                for (int a = 0; a < messageObject.messageOwner.entities.size(); a++) {
-                    TLRPC.MessageEntity entity = messageObject.messageOwner.entities.get(a);
-                    if (entity instanceof TLRPC.TL_messageEntityBold ||
-                            entity instanceof TLRPC.TL_messageEntityItalic ||
-                            entity instanceof TLRPC.TL_messageEntityPre ||
-                            entity instanceof TLRPC.TL_messageEntityCode ||
-                            entity instanceof TLRPC.TL_messageEntityTextUrl ||
-                            entity instanceof TLRPC.TL_messageEntityStrike ||
-                            entity instanceof TLRPC.TL_messageEntityUnderline) {
-                        entities.add(entity);
-                    }
-                    if (entity instanceof TLRPC.TL_messageEntityMentionName) {
-                        TLRPC.TL_inputMessageEntityMentionName mention = new TLRPC.TL_inputMessageEntityMentionName();
-                        mention.length = entity.length;
-                        mention.offset = entity.offset;
-                        mention.user_id = getMessagesController().getInputUser(((TLRPC.TL_messageEntityMentionName) entity).user_id);
-                        entities.add(mention);
-                    }
-                }
-            } else {
-                entities = null;
-            }
-            if (messageObject.messageOwner.media != null && !(messageObject.messageOwner.media instanceof TLRPC.TL_messageMediaEmpty) && !(messageObject.messageOwner.media instanceof TLRPC.TL_messageMediaWebPage) && !(messageObject.messageOwner.media instanceof TLRPC.TL_messageMediaGame) && !(messageObject.messageOwner.media instanceof TLRPC.TL_messageMediaInvoice)) {
-                HashMap<String, String> params = null;
-                if ((int) did == 0 && messageObject.messageOwner.peer_id != null && (messageObject.messageOwner.media.photo instanceof TLRPC.TL_photo || messageObject.messageOwner.media.document instanceof TLRPC.TL_document)) {
-                    params = new HashMap<>();
-                    params.put("parentObject", "sent_" + messageObject.messageOwner.peer_id.channel_id + "_" + messageObject.getId());
-                }
-                long oldGroupId = messageObject.messageOwner.grouped_id;
-                if (oldGroupId != 0) {
-                    if (params == null) {
-                        params = new HashMap<>();
-                    }
-                    Long groupId;
-                    if (map.containsKey(oldGroupId)) {
-                        groupId = map.get(oldGroupId);
-                    } else {
-                        groupId = Utilities.random.nextLong();
-                        map.put(oldGroupId, groupId);
-                    }
-                    params.put("groupId", String.valueOf(groupId));
-                    if (i == messages.size() - 1) {
-                        params.put("final", "true");
-                    } else {
-                        long nextOldGroupId = messages.get(i + 1).messageOwner.grouped_id;
-                        if (nextOldGroupId != oldGroupId) {
-                            params.put("final", "true");
-                        }
-                    }
-                }
-                if (messageObject.messageOwner.media.photo instanceof TLRPC.TL_photo) {
-                    getSendMessagesHelper().sendMessage((TLRPC.TL_photo) messageObject.messageOwner.media.photo, null, did, null, null, messageObject.messageOwner.message, entities, null, params, notify, scheduleDate, 0, messageObject);
-                } else if (messageObject.messageOwner.media.document instanceof TLRPC.TL_document) {
-                    getSendMessagesHelper().sendMessage((TLRPC.TL_document) messageObject.messageOwner.media.document, null, messageObject.messageOwner.attachPath, did, null, null, messageObject.messageOwner.message, entities, null, params, notify, scheduleDate, 0, messageObject);
-                } else if (messageObject.messageOwner.media instanceof TLRPC.TL_messageMediaVenue || messageObject.messageOwner.media instanceof TLRPC.TL_messageMediaGeo) {
-                    getSendMessagesHelper().sendMessage(messageObject.messageOwner.media, did, null, null, null, null, notify, scheduleDate);
-                } else if (messageObject.messageOwner.media.phone_number != null) {
-                    TLRPC.User user = new TLRPC.TL_userContact_old2();
-                    user.phone = messageObject.messageOwner.media.phone_number;
-                    user.first_name = messageObject.messageOwner.media.first_name;
-                    user.last_name = messageObject.messageOwner.media.last_name;
-                    user.id = messageObject.messageOwner.media.user_id;
-                    getSendMessagesHelper().sendMessage(user, did, null, null, null, null, notify, scheduleDate);
-                } else if ((int) did != 0) {
-                    ArrayList<MessageObject> arrayList = new ArrayList<>();
-                    arrayList.add(messageObject);
-                    getSendMessagesHelper().sendMessage(arrayList, did, notify, scheduleDate);
-                }
-            } else if (messageObject.messageOwner.message != null) {
-                TLRPC.WebPage webPage = null;
-                if (messageObject.messageOwner.media instanceof TLRPC.TL_messageMediaWebPage) {
-                    webPage = messageObject.messageOwner.media.webpage;
-                }
-                getSendMessagesHelper().sendMessage(messageObject.messageOwner.message, did, null, null, webPage, webPage != null, entities, null, null, notify, scheduleDate);
-            } else if ((int) did != 0) {
-                ArrayList<MessageObject> arrayList = new ArrayList<>();
-                arrayList.add(messageObject);
-                getSendMessagesHelper().sendMessage(arrayList, did, notify, scheduleDate);
-            }
-        }
+    public void deleteUserChannelHistoryWithSearch(BaseFragment fragment, final long dialogId, final long mergeDialogId) {
+        deleteUserChannelHistoryWithSearch(fragment, dialogId, mergeDialogId, 0, -1);
     }
 
-    public void deleteUserChannelHistoryWithSearch(final long dialog_id, final TLRPC.User user) {
-        deleteUserChannelHistoryWithSearch(dialog_id, user, 0);
-    }
-
-    public void deleteUserChannelHistoryWithSearch(final long dialog_id, final TLRPC.User user, final int offset_id) {
+    public void deleteUserChannelHistoryWithSearch(BaseFragment fragment, final long dialogId, final long mergeDialogId, final int offsetId, int lastSize) {
         final TLRPC.TL_messages_search req = new TLRPC.TL_messages_search();
-        req.peer = getMessagesController().getInputPeer((int) dialog_id);
+        req.peer = getMessagesController().getInputPeer(dialogId);
         if (req.peer == null) {
             return;
         }
         req.limit = 100;
         req.q = "";
-        req.offset_id = offset_id;
-        if (user != null) {
-            req.from_id = MessagesController.getInputPeer(user);
-            req.flags |= 1;
-        }
+        req.offset_id = offsetId;
+        req.from_id = MessagesController.getInputPeer(getUserConfig().getCurrentUser());
+        req.flags |= 1;
         req.filter = new TLRPC.TL_inputMessagesFilterEmpty();
-        final int currentReqId = ++lastReqId;
         getConnectionsManager().sendRequest(req, (response, error) -> AndroidUtilities.runOnUIThread(() -> {
             if (error == null) {
-                int lastMessageId = offset_id;
-                if (currentReqId == lastReqId) {
-                    if (response != null) {
-                        TLRPC.messages_Messages res = (TLRPC.messages_Messages) response;
-                        int size = res.messages.size();
-                        if (size == 0) {
-                            return;
-                        }
-                        FileLog.d("deleteUserChannelHistoryWithSearch size = " + size);
-                        ArrayList<Integer> ids = new ArrayList<>();
-                        int channelId = 0;
-                        for (int a = 0; a < size; a++) {
-                            TLRPC.Message message = res.messages.get(a);
-                            if (message.id == 0) {
-                                continue;
-                            }
-                            if (message.id > lastMessageId) {
-                                lastMessageId = message.id;
-                            }
-                            if (message.peer_id.channel_id != 0) {
-                                channelId = message.peer_id.channel_id;
-                            } else if (message.peer_id.chat_id == 0) {
-                                continue;
-                            }
-                            ids.add(message.id);
-                        }
-                        if (ids.size() == 0) {
-                            return;
-                        }
-                        getMessagesController().deleteMessages(ids, null, null, dialog_id, channelId, true, false);
-                        deleteUserChannelHistoryWithSearch(dialog_id, user, lastMessageId);
+                if (response != null) {
+                    TLRPC.messages_Messages res = (TLRPC.messages_Messages) response;
+                    if (res.messages.size() == 0) {
+                        return;
                     }
+                    ArrayList<Integer> ids = new ArrayList<>();
+                    int newOffsetId = res.messages.get(0).id;
+                    for (TLRPC.Message message : res.messages) {
+                        newOffsetId = Math.min(newOffsetId, message.id);
+                        ids.add(message.id);
+                    }
+                    if (ids.size() == 0) {
+                        return;
+                    }
+                    getMessagesController().deleteMessages(ids, null, null, dialogId, true, false);
+                    if (offsetId == newOffsetId && lastSize == ids.size()) {
+                        return;
+                    }
+                    deleteUserChannelHistoryWithSearch(fragment, dialogId, mergeDialogId, newOffsetId, ids.size());
                 }
+            } else {
+                AlertsCreator.showSimpleAlert(fragment, LocaleController.getString("ErrorOccurred", R.string.ErrorOccurred) + "\n" + error.text);
             }
         }), ConnectionsManager.RequestFlagFailOnServerErrors);
+        if (offsetId == 0 && mergeDialogId != 0) {
+            deleteUserChannelHistoryWithSearch(fragment, mergeDialogId, 0, 0, -1);
+        }
+    }
+
+    public String getDCLocation(int dc) {
+        switch (dc) {
+            case 1:
+            case 3:
+                return "Miami";
+            case 2:
+            case 4:
+                return "Amsterdam";
+            case 5:
+                return "Singapore";
+            default:
+                return "Unknown";
+        }
+    }
+
+    public void sendWebFile(BaseFragment fragment, int did, String url, boolean isPhoto, Theme.ResourcesProvider resourcesProvider) {
+        TLRPC.TL_messages_sendMedia req = new TLRPC.TL_messages_sendMedia();
+        TLRPC.InputMedia media;
+        if (isPhoto) {
+            TLRPC.TL_inputMediaPhotoExternal photo = new TLRPC.TL_inputMediaPhotoExternal();
+            photo.url = url;
+            media = photo;
+        } else {
+            TLRPC.TL_inputMediaDocumentExternal document = new TLRPC.TL_inputMediaDocumentExternal();
+            document.url = url;
+            media = document;
+        }
+        req.media = media;
+        req.random_id = Utilities.random.nextLong();
+        req.peer = getMessagesController().getInputPeer(did);
+        req.message = "";
+        getConnectionsManager().sendRequest(req, (response, error) -> {
+            if (error == null) {
+                getMessagesController().processUpdates((TLRPC.Updates) response, false);
+            } else {
+                AndroidUtilities.runOnUIThread(() -> {
+                    if (error.text.equals("MEDIA_EMPTY")) {
+                        BulletinFactory.of(fragment).createErrorBulletin(LocaleController.getString("SendWebFileInvalid", R.string.SendWebFileInvalid), resourcesProvider).show();
+                    } else {
+                        AlertsCreator.showSimpleAlert(fragment, LocaleController.getString("SendWebFile", R.string.SendWebFile), LocaleController.getString("ErrorOccurred", R.string.ErrorOccurred) + "\n" + error.text, resourcesProvider);
+                    }
+                });
+            }
+        });
+    }
+
+    @SuppressLint("SetTextI18n")
+    public void showSendWebFileDialog(ChatAttachAlert parentAlert, Theme.ResourcesProvider resourcesProvider) {
+        ChatActivity fragment = (ChatActivity) parentAlert.getBaseFragment();
+        Context context = fragment.getParentActivity();
+        AlertDialog.Builder builder = new AlertDialog.Builder(context, resourcesProvider);
+        builder.setTitle(LocaleController.getString("SendWebFile", R.string.SendWebFile));
+        builder.setMessage(LocaleController.getString("SendWebFileInfo", R.string.SendWebFileInfo));
+        builder.setCustomViewOffset(0);
+
+        LinearLayout ll = new LinearLayout(context);
+        ll.setOrientation(LinearLayout.VERTICAL);
+
+        final EditTextBoldCursor editText = new EditTextBoldCursor(context) {
+            @Override
+            protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+                super.onMeasure(widthMeasureSpec, MeasureSpec.makeMeasureSpec(AndroidUtilities.dp(64), MeasureSpec.EXACTLY));
+            }
+        };
+        editText.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 18);
+        editText.setText("http://");
+        editText.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider));
+        editText.setHintText(LocaleController.getString("URL", R.string.URL));
+        editText.setHeaderHintColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlueHeader, resourcesProvider));
+        editText.setSingleLine(true);
+        editText.setFocusable(true);
+        editText.setTransformHintToHeader(true);
+        editText.setLineColors(Theme.getColor(Theme.key_windowBackgroundWhiteInputField, resourcesProvider), Theme.getColor(Theme.key_windowBackgroundWhiteInputFieldActivated, resourcesProvider), Theme.getColor(Theme.key_windowBackgroundWhiteRedText3, resourcesProvider));
+        editText.setImeOptions(EditorInfo.IME_ACTION_DONE);
+        editText.setBackground(null);
+        editText.requestFocus();
+        editText.setPadding(0, 0, 0, 0);
+        ll.addView(editText, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 36, 0, 24, 0, 24, 0));
+
+        CheckBoxCell cell = new CheckBoxCell(context, 1, resourcesProvider);
+        cell.setBackground(Theme.getSelectorDrawable(false));
+        cell.setText(LocaleController.getString("SendWithoutCompression", R.string.SendWithoutCompression), "", true, false);
+        cell.setPadding(LocaleController.isRTL ? AndroidUtilities.dp(16) : AndroidUtilities.dp(8), 0, LocaleController.isRTL ? AndroidUtilities.dp(8) : AndroidUtilities.dp(16), 0);
+        ll.addView(cell, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, 48));
+        cell.setOnClickListener(v -> {
+            CheckBoxCell cell12 = (CheckBoxCell) v;
+            cell12.setChecked(!cell12.isChecked(), true);
+        });
+
+        builder.setView(ll);
+        builder.setPositiveButton(LocaleController.getString("OK", R.string.OK), (dialogInterface, i) -> sendWebFile(fragment, (int) fragment.getDialogId(), editText.getText().toString(), !cell.isChecked(), resourcesProvider));
+        builder.setNegativeButton(LocaleController.getString("Cancel", R.string.Cancel), null);
+
+        AlertDialog alertDialog = builder.create();
+        alertDialog.setOnShowListener(dialog -> {
+            editText.requestFocus();
+            AndroidUtilities.showKeyboard(editText);
+        });
+        fragment.showDialog(alertDialog);
+        editText.setSelection(0, editText.getText().length());
     }
 }

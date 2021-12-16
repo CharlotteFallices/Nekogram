@@ -21,9 +21,11 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.DialogObject;
 import org.telegram.messenger.ImageLocation;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessagesController;
+import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.UserObject;
 import org.telegram.messenger.R;
 import org.telegram.tgnet.ConnectionsManager;
@@ -32,6 +34,7 @@ import org.telegram.messenger.UserConfig;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.AvatarDrawable;
 import org.telegram.ui.Components.BackupImageView;
+import org.telegram.ui.Components.Bulletin;
 import org.telegram.ui.Components.CheckBox;
 import org.telegram.ui.Components.CheckBoxSquare;
 import org.telegram.ui.Components.LayoutHelper;
@@ -48,6 +51,7 @@ public class UserCell extends FrameLayout {
     private CheckBoxSquare checkBoxBig;
     private TextView adminTextView;
     private TextView addButton;
+    private ImageView mutualView;
 
     private AvatarDrawable avatarDrawable;
     private Object currentObject;
@@ -76,6 +80,10 @@ public class UserCell extends FrameLayout {
     }
 
     public UserCell(Context context, int padding, int checkbox, boolean admin, boolean needAddButton) {
+        this(context, padding, checkbox, admin, needAddButton, false);
+    }
+
+    public UserCell(Context context, int padding, int checkbox, boolean admin, boolean needAddButton, boolean needMutualIcon) {
         super(context);
 
         int additionalPadding;
@@ -136,6 +144,18 @@ public class UserCell extends FrameLayout {
             adminTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 14);
             adminTextView.setTextColor(Theme.getColor(Theme.key_profile_creatorIcon));
             addView(adminTextView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, (LocaleController.isRTL ? Gravity.LEFT : Gravity.RIGHT) | Gravity.TOP, LocaleController.isRTL ? 23 : 0, 10, LocaleController.isRTL ? 0 : 23, 0));
+        }
+
+        if (needMutualIcon) {
+            mutualView = new ImageView(context);
+            mutualView.setImageResource(R.drawable.ic_round_swap_horiz_24);
+            mutualView.setBackground(Theme.createSelectorDrawable(Theme.getColor(Theme.key_player_actionBarSelector)));
+            mutualView.setScaleType(ImageView.ScaleType.CENTER);
+            mutualView.setColorFilter(new PorterDuffColorFilter(Theme.getColor(Theme.key_windowBackgroundWhiteGrayIcon), PorterDuff.Mode.MULTIPLY));
+            mutualView.setVisibility(GONE);
+            mutualView.setContentDescription(LocaleController.getString("MutualContact", R.string.MutualContact));
+            mutualView.setOnClickListener(v -> NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.showBulletin, Bulletin.TYPE_ERROR, LocaleController.getString("MutualContactDescription", R.string.MutualContactDescription)));
+            addView(mutualView, LayoutHelper.createFrame(40, 40, (LocaleController.isRTL ? Gravity.LEFT : Gravity.RIGHT) | Gravity.CENTER_VERTICAL, LocaleController.isRTL ? 8 : 0, 0, LocaleController.isRTL ? 0 : 8, 0));
         }
 
         setFocusable(true);
@@ -263,27 +283,23 @@ public class UserCell extends FrameLayout {
             text = LocaleController.getString("NotificationsOff", R.string.NotificationsOff);
         }
 
-        int lower_id = (int) exception.did;
-        int high_id = (int) (exception.did >> 32);
-        if (lower_id != 0) {
-            if (lower_id > 0) {
-                TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(lower_id);
-                if (user != null) {
-                    setData(user, null, name, text, 0, divider);
-                }
-            } else {
-                TLRPC.Chat chat = MessagesController.getInstance(currentAccount).getChat(-lower_id);
-                if (chat != null) {
-                    setData(chat, null, name, text, 0, divider);
-                }
-            }
-        } else {
-            TLRPC.EncryptedChat encryptedChat = MessagesController.getInstance(currentAccount).getEncryptedChat(high_id);
+        if (DialogObject.isEncryptedDialog(exception.did)) {
+            TLRPC.EncryptedChat encryptedChat = MessagesController.getInstance(currentAccount).getEncryptedChat(DialogObject.getEncryptedChatId(exception.did));
             if (encryptedChat != null) {
                 TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(encryptedChat.user_id);
                 if (user != null) {
                     setData(user, encryptedChat, name, text, 0, false);
                 }
+            }
+        } else if (DialogObject.isUserDialog(exception.did)) {
+            TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(exception.did);
+            if (user != null) {
+                setData(user, null, name, text, 0, divider);
+            }
+        } else {
+            TLRPC.Chat chat = MessagesController.getInstance(currentAccount).getChat(-exception.did);
+            if (chat != null) {
+                setData(chat, null, name, text, 0, divider);
             }
         }
     }
@@ -344,18 +360,6 @@ public class UserCell extends FrameLayout {
             if (currentUser.photo != null) {
                 photo = currentUser.photo.photo_small;
             }
-            /*if (encryptedChat != null) {
-                drawNameLock = true;
-                dialog_id = ((long) encryptedChat.id) << 32;
-                if (!LocaleController.isRTL) {
-                    nameLockLeft = AndroidUtilities.dp(AndroidUtilities.leftBaseline);
-                    nameLeft = AndroidUtilities.dp(AndroidUtilities.leftBaseline + 4) + Theme.dialogs_lockDrawable.getIntrinsicWidth();
-                } else {
-                    nameLockLeft = getMeasuredWidth() - AndroidUtilities.dp(AndroidUtilities.leftBaseline + 2) - Theme.dialogs_lockDrawable.getIntrinsicWidth();
-                    nameLeft = AndroidUtilities.dp(11);
-                }
-                nameLockTop = AndroidUtilities.dp(16.5f);
-            }*/
         } else if (currentObject instanceof TLRPC.Chat) {
             currentChat = (TLRPC.Chat) currentObject;
             if (currentChat.photo != null) {
@@ -366,7 +370,7 @@ public class UserCell extends FrameLayout {
         if (mask != 0) {
             boolean continueUpdate = false;
             if ((mask & MessagesController.UPDATE_MASK_AVATAR) != 0) {
-                if (lastAvatar != null && photo == null || lastAvatar == null && photo != null || lastAvatar != null && photo != null && (lastAvatar.volume_id != photo.volume_id || lastAvatar.local_id != photo.local_id)) {
+                if (lastAvatar != null && photo == null || lastAvatar == null && photo != null || lastAvatar != null && (lastAvatar.volume_id != photo.volume_id || lastAvatar.local_id != photo.local_id)) {
                     continueUpdate = true;
                 }
             }
@@ -493,11 +497,20 @@ public class UserCell extends FrameLayout {
 
         lastAvatar = photo;
         if (currentUser != null) {
-            avatarImageView.setImage(ImageLocation.getForUser(currentUser, false), "50_50", avatarDrawable, currentUser);
+            avatarImageView.setForUserOrChat(currentUser, avatarDrawable);
         } else if (currentChat != null) {
-            avatarImageView.setImage(ImageLocation.getForChat(currentChat, false), "50_50", avatarDrawable, currentChat);
+            avatarImageView.setForUserOrChat(currentChat, avatarDrawable);
         } else {
             avatarImageView.setImageDrawable(avatarDrawable);
+        }
+
+        nameTextView.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
+        if (adminTextView != null) {
+            adminTextView.setTextColor(Theme.getColor(Theme.key_profile_creatorIcon));
+        }
+
+        if (mutualView != null) {
+            mutualView.setVisibility(currentUser != null && currentUser.mutual_contact ? VISIBLE : GONE);
         }
     }
 

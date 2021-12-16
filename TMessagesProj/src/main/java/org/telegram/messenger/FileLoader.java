@@ -25,15 +25,17 @@ import java.util.LinkedList;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 
+import tw.nekomimi.nekogram.NekoConfig;
+
 public class FileLoader extends BaseController {
 
     public interface FileLoaderDelegate {
-        void fileUploadProgressChanged(String location, long uploadedSize, long totalSize, boolean isEncrypted);
+        void fileUploadProgressChanged(FileUploadOperation operation, String location, long uploadedSize, long totalSize, boolean isEncrypted);
         void fileDidUploaded(String location, TLRPC.InputFile inputFile, TLRPC.InputEncryptedFile inputEncryptedFile, byte[] key, byte[] iv, long totalFileSize);
         void fileDidFailedUpload(String location, boolean isEncrypted);
         void fileDidLoaded(String location, File finalFile, int type);
         void fileDidFailedLoad(String location, int state);
-        void fileLoadProgressChanged(String location, long uploadedSize, long totalSize);
+        void fileLoadProgressChanged(FileLoadOperation operation, String location, long uploadedSize, long totalSize);
     }
 
     public static final int MEDIA_DIR_IMAGE = 0;
@@ -191,7 +193,7 @@ public class FileLoader extends BaseController {
         return isLoadingVideo(document, false) || isLoadingVideo(document, true);
     }
 
-    public void cancelUploadFile(final String location, final boolean enc) {
+    public void cancelFileUpload(final String location, final boolean enc) {
         fileLoaderQueue.postRunnable(() -> {
             FileUploadOperation operation;
             if (!enc) {
@@ -237,10 +239,10 @@ public class FileLoader extends BaseController {
     }
 
     public void uploadFile(final String location, final boolean encrypted, final boolean small, final int type) {
-        uploadFile(location, encrypted, small, 0, type);
+        uploadFile(location, encrypted, small, 0, type, false);
     }
 
-    public void uploadFile(final String location, final boolean encrypted, final boolean small, final int estimatedSize, final int type) {
+    public void uploadFile(final String location, final boolean encrypted, final boolean small, final int estimatedSize, final int type, boolean forceSmallFile) {
         if (location == null) {
             return;
         }
@@ -262,14 +264,17 @@ public class FileLoader extends BaseController {
                     uploadSizes.remove(location);
                 }
             }
-            if (delegate != null && estimatedSize != 0) {
-                delegate.fileUploadProgressChanged(location, 0, estimatedSize, encrypted);
-            }
             FileUploadOperation operation = new FileUploadOperation(currentAccount, location, encrypted, esimated, type);
+            if (delegate != null && estimatedSize != 0) {
+                delegate.fileUploadProgressChanged(operation, location, 0, estimatedSize, encrypted);
+            }
             if (encrypted) {
                 uploadOperationPathsEnc.put(location, operation);
             } else {
                 uploadOperationPaths.put(location, operation);
+            }
+            if (forceSmallFile) {
+                operation.setForceSmallFile();
             }
             operation.setDelegate(new FileUploadOperation.FileUploadOperationDelegate() {
                 @Override
@@ -341,7 +346,7 @@ public class FileLoader extends BaseController {
                 @Override
                 public void didChangedUploadProgress(FileUploadOperation operation, long uploadedSize, long totalSize) {
                     if (delegate != null) {
-                        delegate.fileUploadProgressChanged(location, uploadedSize, totalSize, encrypted);
+                        delegate.fileUploadProgressChanged(operation, location, uploadedSize, totalSize, encrypted);
                     }
                 }
             });
@@ -715,7 +720,7 @@ public class FileLoader extends BaseController {
             @Override
             public void didChangedLoadProgress(FileLoadOperation operation, long uploadedSize, long totalSize) {
                 if (delegate != null) {
-                    delegate.fileLoadProgressChanged(fileName, uploadedSize, totalSize);
+                    delegate.fileLoadProgressChanged(operation, fileName, uploadedSize, totalSize);
                 }
             }
         };
@@ -880,7 +885,7 @@ public class FileLoader extends BaseController {
             } else if (message.media instanceof TLRPC.TL_messageMediaPhoto) {
                 ArrayList<TLRPC.PhotoSize> sizes = message.media.photo.sizes;
                 if (sizes.size() > 0) {
-                    TLRPC.PhotoSize sizeFull = getClosestPhotoSizeWithSize(sizes, AndroidUtilities.getPhotoSize());
+                    TLRPC.PhotoSize sizeFull = getClosestPhotoSizeWithSize(sizes, AndroidUtilities.getPhotoSize(), false, null, true);
                     if (sizeFull != null) {
                         return getAttachFileName(sizeFull);
                     }
@@ -923,13 +928,13 @@ public class FileLoader extends BaseController {
             }
         } else {
             if (message.media instanceof TLRPC.TL_messageMediaDocument) {
-                return getPathToAttach(message.media.document, message.media.ttl_seconds != 0);
+                return getPathToAttach(message.media.document, !NekoConfig.shouldNOTTrustMe && message.media.ttl_seconds != 0);
             } else if (message.media instanceof TLRPC.TL_messageMediaPhoto) {
                 ArrayList<TLRPC.PhotoSize> sizes = message.media.photo.sizes;
                 if (sizes.size() > 0) {
-                    TLRPC.PhotoSize sizeFull = getClosestPhotoSizeWithSize(sizes, AndroidUtilities.getPhotoSize());
+                    TLRPC.PhotoSize sizeFull = getClosestPhotoSizeWithSize(sizes, AndroidUtilities.getPhotoSize(), false, null, true);
                     if (sizeFull != null) {
-                        return getPathToAttach(sizeFull, message.media.ttl_seconds != 0);
+                        return getPathToAttach(sizeFull, !NekoConfig.shouldNOTTrustMe && message.media.ttl_seconds != 0);
                     }
                 }
             } else if (message.media instanceof TLRPC.TL_messageMediaWebPage) {
@@ -960,6 +965,10 @@ public class FileLoader extends BaseController {
     }
 
     public static File getPathToAttach(TLObject attach, String ext, boolean forceCache) {
+        return getPathToAttach(attach, null, ext, forceCache);
+    }
+
+    public static File getPathToAttach(TLObject attach, String size, String ext, boolean forceCache) {
         File dir = null;
         if (forceCache) {
             dir = getDirectory(MEDIA_DIR_CACHE);
@@ -1003,6 +1012,15 @@ public class FileLoader extends BaseController {
                 } else {
                     dir = getDirectory(MEDIA_DIR_IMAGE);
                 }
+            } else if (attach instanceof TLRPC.UserProfilePhoto || attach instanceof TLRPC.ChatPhoto) {
+                if (size == null) {
+                    size = "s";
+                }
+                if ("s".equals(size)) {
+                    dir = getDirectory(MEDIA_DIR_CACHE);
+                } else {
+                    dir = getDirectory(MEDIA_DIR_IMAGE);
+                }
             } else if (attach instanceof WebFile) {
                 WebFile document = (WebFile) attach;
                 if (document.mime_type.startsWith("image/")) {
@@ -1029,10 +1047,10 @@ public class FileLoader extends BaseController {
     }
 
     public static TLRPC.PhotoSize getClosestPhotoSizeWithSize(ArrayList<TLRPC.PhotoSize> sizes, int side, boolean byMinSide) {
-        return getClosestPhotoSizeWithSize(sizes, side, byMinSide, null);
+        return getClosestPhotoSizeWithSize(sizes, side, byMinSide, null, false);
     }
 
-    public static TLRPC.PhotoSize getClosestPhotoSizeWithSize(ArrayList<TLRPC.PhotoSize> sizes, int side, boolean byMinSide, TLRPC.PhotoSize toIgnore) {
+    public static TLRPC.PhotoSize getClosestPhotoSizeWithSize(ArrayList<TLRPC.PhotoSize> sizes, int side, boolean byMinSide, TLRPC.PhotoSize toIgnore, boolean ignoreStripped) {
         if (sizes == null || sizes.isEmpty()) {
             return null;
         }
@@ -1040,7 +1058,7 @@ public class FileLoader extends BaseController {
         TLRPC.PhotoSize closestObject = null;
         for (int a = 0; a < sizes.size(); a++) {
             TLRPC.PhotoSize obj = sizes.get(a);
-            if (obj == null || obj == toIgnore || obj instanceof TLRPC.TL_photoSizeEmpty || obj instanceof TLRPC.TL_photoPathSize) {
+            if (obj == null || obj == toIgnore || obj instanceof TLRPC.TL_photoSizeEmpty || obj instanceof TLRPC.TL_photoPathSize || ignoreStripped && obj instanceof TLRPC.TL_photoStrippedSize) {
                 continue;
             }
             if (byMinSide) {
@@ -1156,6 +1174,10 @@ public class FileLoader extends BaseController {
     }
 
     public static String getAttachFileName(TLObject attach, String ext) {
+        return getAttachFileName(attach, null, ext);
+    }
+
+    public static String getAttachFileName(TLObject attach, String size, String ext) {
         if (attach instanceof TLRPC.Document) {
             TLRPC.Document document = (TLRPC.Document) attach;
             String docExt;
@@ -1201,6 +1223,31 @@ public class FileLoader extends BaseController {
             }
             TLRPC.FileLocation location = (TLRPC.FileLocation) attach;
             return location.volume_id + "_" + location.local_id + "." + (ext != null ? ext : "jpg");
+        } else if (attach instanceof TLRPC.UserProfilePhoto) {
+            if (size == null) {
+                size = "s";
+            }
+            TLRPC.UserProfilePhoto location = (TLRPC.UserProfilePhoto) attach;
+            if (location.photo_small != null) {
+                if ("s".equals(size)) {
+                    return getAttachFileName(location.photo_small, ext);
+                } else {
+                    return getAttachFileName(location.photo_big, ext);
+                }
+            } else {
+                return location.photo_id + "_" + size + "." + (ext != null ? ext : "jpg");
+            }
+        } else if (attach instanceof TLRPC.ChatPhoto) {
+            TLRPC.ChatPhoto location = (TLRPC.ChatPhoto) attach;
+            if (location.photo_small != null) {
+                if ("s".equals(size)) {
+                    return getAttachFileName(location.photo_small, ext);
+                } else {
+                    return getAttachFileName(location.photo_big, ext);
+                }
+            } else {
+                return location.photo_id + "_" + size + "." + (ext != null ? ext : "jpg");
+            }
         }
         return "";
     }
@@ -1281,6 +1328,28 @@ public class FileLoader extends BaseController {
         return true;
     }
 
+    public static boolean isSamePhoto(TLObject photo1, TLObject photo2) {
+        if (photo1 == null && photo2 != null || photo1 != null && photo2 == null) {
+            return false;
+        }
+        if (photo1 == null && photo2 == null) {
+            return true;
+        }
+        if (photo1.getClass() != photo2.getClass()) {
+            return false;
+        }
+        if (photo1 instanceof TLRPC.UserProfilePhoto) {
+            TLRPC.UserProfilePhoto p1 = (TLRPC.UserProfilePhoto) photo1;
+            TLRPC.UserProfilePhoto p2 = (TLRPC.UserProfilePhoto) photo2;
+            return p1.photo_id == p2.photo_id;
+        } else if (photo1 instanceof TLRPC.ChatPhoto) {
+            TLRPC.ChatPhoto p1 = (TLRPC.ChatPhoto) photo1;
+            TLRPC.ChatPhoto p2 = (TLRPC.ChatPhoto) photo2;
+            return p1.photo_id == p2.photo_id;
+        }
+        return false;
+    }
+
     public static boolean isSamePhoto(TLRPC.FileLocation location, TLRPC.Photo photo) {
         if (location == null || !(photo instanceof TLRPC.TL_photo)) {
             return false;
@@ -1291,6 +1360,20 @@ public class FileLoader extends BaseController {
                 return true;
             }
         }
+        if (-location.volume_id == photo.id) {
+            return true;
+        }
         return false;
+    }
+
+    public static long getPhotoId(TLObject object) {
+        if (object instanceof TLRPC.Photo) {
+            return ((TLRPC.Photo) object).id;
+        } else if (object instanceof TLRPC.ChatPhoto) {
+            return ((TLRPC.ChatPhoto) object).photo_id;
+        } else if (object instanceof TLRPC.UserProfilePhoto) {
+            return ((TLRPC.UserProfilePhoto) object).photo_id;
+        }
+        return 0;
     }
 }

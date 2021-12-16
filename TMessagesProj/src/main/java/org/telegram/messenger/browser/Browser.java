@@ -26,12 +26,14 @@ import androidx.browser.customtabs.CustomTabsIntent;
 import androidx.browser.customtabs.CustomTabsServiceConnection;
 import androidx.browser.customtabs.CustomTabsSession;
 
+import org.telegram.messenger.AccountInstance;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.CustomTabsCopyReceiver;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.ShareBroadcastReceiver;
@@ -47,6 +49,7 @@ import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.LaunchActivity;
 
 import java.lang.ref.WeakReference;
+import java.net.URLEncoder;
 import java.util.List;
 
 import tw.nekomimi.nekogram.NekoConfig;
@@ -189,7 +192,7 @@ public class Browser {
         if (tryTelegraph) {
             try {
                 String host = uri.getHost().toLowerCase();
-                if (isTelegraphUrl(host, true) || host.equals("nekogram.github.io") || uri.toString().toLowerCase().contains("telegram.org/faq") || NekoConfig.tryToOpenAllLinksInIV) {
+                if (NekoConfig.tryToOpenAllLinksInIV || isTelegraphUrl(host, true) || uri.toString().toLowerCase().contains("telegram.org/faq") || uri.toString().toLowerCase().contains("telegram.org/privacy")) {
                     final AlertDialog[] progressDialog = new AlertDialog[]{new AlertDialog(context, 3)};
 
                     Uri finalUri = uri;
@@ -240,6 +243,24 @@ public class Browser {
                 } catch (Exception e) {
                     FileLog.e(e);
                 }
+            }
+            String host = uri.getHost() != null ? uri.getHost().toLowerCase() : "";
+            if (AccountInstance.getInstance(currentAccount).getMessagesController().autologinDomains.contains(host)) {
+                String token = "autologin_token=" + URLEncoder.encode(AccountInstance.getInstance(UserConfig.selectedAccount).getMessagesController().autologinToken, "UTF-8");
+                String url = uri.toString();
+                int idx = url.indexOf("://");
+                String path = idx >= 0 ? url.substring(idx + 3) : url;
+                String fragment = uri.getEncodedFragment();
+                String finalPath = fragment == null ? path : path.substring(0, path.indexOf("#" + fragment));
+                if (finalPath.indexOf('?') >= 0) {
+                    finalPath += "&" + token;
+                } else {
+                    finalPath += "?" + token;
+                }
+                if (fragment != null) {
+                    finalPath += "#" + fragment;
+                }
+                uri = Uri.parse("https://" + finalPath);
             }
             if (allowCustom && SharedConfig.customTabs && !internalUri && !scheme.equals("tel")) {
                 String[] browserPackageNames = null;
@@ -294,24 +315,18 @@ public class Browser {
                     Intent share = new Intent(ApplicationLoader.applicationContext, ShareBroadcastReceiver.class);
                     share.setAction(Intent.ACTION_SEND);
 
-                    PendingIntent copy = PendingIntent.getBroadcast(ApplicationLoader.applicationContext, 0, new Intent(ApplicationLoader.applicationContext, CustomTabsCopyReceiver.class), PendingIntent.FLAG_UPDATE_CURRENT);
+                    PendingIntent copy = PendingIntent.getBroadcast(ApplicationLoader.applicationContext, 0, new Intent(ApplicationLoader.applicationContext, CustomTabsCopyReceiver.class), PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
 
                     CustomTabsIntent.Builder builder = new CustomTabsIntent.Builder(getSession());
                     builder.addMenuItem(LocaleController.getString("CopyLink", R.string.CopyLink), copy);
 
-                    boolean dark = false;
-                    if (Theme.getActiveTheme().isDark()) {
-                        dark = true;
-                    } else if (AndroidUtilities.computePerceivedBrightness(Theme.getColor(Theme.key_windowBackgroundWhite)) < 0.721f) {
-                        dark = true;
-                    }
-                    builder.setColorScheme(dark ? CustomTabsIntent.COLOR_SCHEME_DARK : CustomTabsIntent.COLOR_SCHEME_LIGHT);
+                    builder.setColorScheme(Theme.getActiveTheme().isDark() ? CustomTabsIntent.COLOR_SCHEME_DARK : CustomTabsIntent.COLOR_SCHEME_LIGHT);
                     CustomTabColorSchemeParams params = new CustomTabColorSchemeParams.Builder()
                             .setToolbarColor(Theme.getColor(Theme.key_actionBarBrowser))
                             .build();
                     builder.setDefaultColorSchemeParams(params);
                     builder.setShowTitle(true);
-                    builder.setActionButton(BitmapFactory.decodeResource(context.getResources(), R.drawable.abc_ic_menu_share_mtrl_alpha), LocaleController.getString("ShareFile", R.string.ShareFile), PendingIntent.getBroadcast(ApplicationLoader.applicationContext, 0, share, 0), true);
+                    builder.setActionButton(BitmapFactory.decodeResource(context.getResources(), R.drawable.abc_ic_menu_share_mtrl_alpha), LocaleController.getString("ShareFile", R.string.ShareFile), PendingIntent.getBroadcast(ApplicationLoader.applicationContext, 0, share, PendingIntent.FLAG_IMMUTABLE), true);
                     CustomTabsIntent intent = builder.build();
                     intent.intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                     intent.launchUrl(context, uri);

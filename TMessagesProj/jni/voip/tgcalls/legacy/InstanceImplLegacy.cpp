@@ -209,6 +209,9 @@ void InstanceImplLegacy::receiveSignalingData(const std::vector<uint8_t> &data) 
 void InstanceImplLegacy::setVideoCapture(std::shared_ptr<VideoCaptureInterface> videoCapture) {
 }
 
+void InstanceImplLegacy::sendVideoDeviceUpdated() {
+}
+
 void InstanceImplLegacy::setRequestedVideoAspect(float aspect) {
 }
 
@@ -240,9 +243,9 @@ void InstanceImplLegacy::setOutputVolume(float level) {
 }
 
 void InstanceImplLegacy::setAudioOutputDuckingEnabled(bool enabled) {
-#if defined(__APPLE__) && defined(TARGET_OS_OSX)
+#if defined(__APPLE__) && TARGET_OS_OSX
 	controller_->SetAudioOutputDuckingEnabled(enabled);
-#endif
+#endif // TARGET_OS_OSX
 }
 
 void InstanceImplLegacy::setIsLowBatteryLevel(bool isLowBatteryLevel) {

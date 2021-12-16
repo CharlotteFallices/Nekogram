@@ -15,7 +15,7 @@ import java.util.List;
 
 public final class Instance {
 
-    public static final List<String> AVAILABLE_VERSIONS = Build.VERSION.SDK_INT >= 18 ? Arrays.asList(/*"3.0.0", */"2.7.7", "2.4.4") : Arrays.asList("2.4.4");
+    public static final List<String> AVAILABLE_VERSIONS = Build.VERSION.SDK_INT >= 18 ? Arrays.asList("3.0.0", "2.7.7", "2.4.4") : Arrays.asList("2.4.4");
 
     public static final int AUDIO_STATE_MUTED = 0;
     public static final int AUDIO_STATE_ACTIVE = 1;
@@ -95,11 +95,11 @@ public final class Instance {
         instance = null;
     }
 
-    public static NativeInstance makeInstance(String version, Config config, String persistentStateFilePath, Endpoint[] endpoints, Proxy proxy, int networkType, EncryptionKey encryptionKey, VideoSink remoteSink, long videoCapturer) {
+    public static NativeInstance makeInstance(String version, Config config, String persistentStateFilePath, Endpoint[] endpoints, Proxy proxy, int networkType, EncryptionKey encryptionKey, VideoSink remoteSink, long videoCapturer, NativeInstance.AudioLevelsCallback audioLevelsCallback) {
         if (!"2.4.4".equals(version)) {
             ContextUtils.initialize(ApplicationLoader.applicationContext);
         }
-        instance = NativeInstance.make(version, config, persistentStateFilePath, endpoints, proxy, networkType, encryptionKey, remoteSink, videoCapturer);
+        instance = NativeInstance.make(version, config, persistentStateFilePath, endpoints, proxy, networkType, encryptionKey, remoteSink, videoCapturer, audioLevelsCallback);
         setGlobalServerConfig(globalServerConfig.jsonObject.toString());
         setBufferSize(bufferSize);
         return instance;
@@ -127,7 +127,7 @@ public final class Instance {
     }
 
     public interface OnStateUpdatedListener {
-        void onStateUpdated(int state);
+        void onStateUpdated(int state, boolean inTransition);
     }
 
     public interface OnSignalBarsUpdatedListener {

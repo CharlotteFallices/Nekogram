@@ -97,14 +97,14 @@ public class LocationSharingService extends Service implements NotificationCente
         String str;
         if (infos.size() == 1) {
             LocationController.SharingLocationInfo info = infos.get(0);
-            int lower_id = (int) info.messageObject.getDialogId();
+            long dialogId = info.messageObject.getDialogId();
             int currentAccount = info.messageObject.currentAccount;
-            if (lower_id > 0) {
-                TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(lower_id);
+            if (DialogObject.isUserDialog(dialogId)) {
+                TLRPC.User user = MessagesController.getInstance(currentAccount).getUser(dialogId);
                 param = UserObject.getFirstName(user);
                 str = LocaleController.getString("AttachLiveLocationIsSharing", R.string.AttachLiveLocationIsSharing);
             } else {
-                TLRPC.Chat chat = MessagesController.getInstance(currentAccount).getChat(-lower_id);
+                TLRPC.Chat chat = MessagesController.getInstance(currentAccount).getChat(-dialogId);
                 if (chat != null) {
                     param = chat.title;
                 } else {
@@ -132,7 +132,7 @@ public class LocationSharingService extends Service implements NotificationCente
             Intent intent2 = new Intent(ApplicationLoader.applicationContext, LaunchActivity.class);
             intent2.setAction("org.tmessages.openlocations");
             intent2.addCategory(Intent.CATEGORY_LAUNCHER);
-            PendingIntent contentIntent = PendingIntent.getActivity(ApplicationLoader.applicationContext, 0, intent2, 0);
+            PendingIntent contentIntent = PendingIntent.getActivity(ApplicationLoader.applicationContext, 0, intent2, PendingIntent.FLAG_IMMUTABLE);
 
             builder = new NotificationCompat.Builder(ApplicationLoader.applicationContext);
             builder.setWhen(System.currentTimeMillis());
@@ -142,7 +142,7 @@ public class LocationSharingService extends Service implements NotificationCente
             builder.setChannelId(NotificationsController.OTHER_NOTIFICATIONS_CHANNEL);
             builder.setContentTitle(LocaleController.getString("AppName", R.string.AppName));
             Intent stopIntent = new Intent(ApplicationLoader.applicationContext, StopLiveLocationReceiver.class);
-            builder.addAction(0, LocaleController.getString("StopLiveLocation", R.string.StopLiveLocation), PendingIntent.getBroadcast(ApplicationLoader.applicationContext, 2, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT));
+            builder.addAction(0, LocaleController.getString("StopLiveLocation", R.string.StopLiveLocation), PendingIntent.getBroadcast(ApplicationLoader.applicationContext, 2, stopIntent, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
         }
 
         updateNotification(false);

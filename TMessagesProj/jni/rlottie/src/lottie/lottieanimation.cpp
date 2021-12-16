@@ -60,7 +60,7 @@ private:
     std::shared_ptr<LOTModel>    mModel;
     std::unique_ptr<LOTCompItem> mCompItem;
     SharedRenderTask             mTask;
-    std::atomic<bool>            mRenderInProgress;
+    std::atomic<bool>            mRenderInProgress{false};
 };
 
 void AnimationImpl::setValue(const std::string &keypath, LOTVariant &&value)
@@ -125,6 +125,7 @@ void AnimationImpl::init(const std::shared_ptr<LOTModel> &model)
 std::unique_ptr<Animation> Animation::loadFromData(
     std::string jsonData, const std::string &key,
     std::map<int32_t, int32_t> *colorReplacement,
+    FitzModifier fitzModifier,
     const std::string &resourcePath)
 {
     if (jsonData.empty()) {
@@ -135,19 +136,17 @@ std::unique_ptr<Animation> Animation::loadFromData(
     LottieLoader loader;
     if (loader.loadFromData(std::move(jsonData), key,
                             colorReplacement,
-                            (resourcePath.empty() ? " " : resourcePath))) {
+                            (resourcePath.empty() ? " " : resourcePath), fitzModifier)) {
         auto animation = std::unique_ptr<Animation>(new Animation);
         animation->colorMap = colorReplacement;
         animation->d->init(loader.model());
         return animation;
     }
-    if (colorReplacement != nullptr) {
-        delete colorReplacement;
-    }
+    delete colorReplacement;
     return nullptr;
 }
 
-std::unique_ptr<Animation> Animation::loadFromFile(const std::string &path, std::map<int32_t, int32_t> *colorReplacement)
+std::unique_ptr<Animation> Animation::loadFromFile(const std::string &path, std::map<int32_t, int32_t> *colorReplacement, FitzModifier fitzModifier)
 {
     if (path.empty()) {
         vWarning << "File path is empty";
@@ -155,15 +154,13 @@ std::unique_ptr<Animation> Animation::loadFromFile(const std::string &path, std:
     }
 
     LottieLoader loader;
-    if (loader.load(path, colorReplacement)) {
+    if (loader.load(path, colorReplacement, fitzModifier)) {
         auto animation = std::unique_ptr<Animation>(new Animation);
         animation->colorMap = colorReplacement;
         animation->d->init(loader.model());
         return animation;
     }
-    if (colorReplacement != nullptr) {
-        delete colorReplacement;
-    }
+    delete colorReplacement;
     return nullptr;
 }
 

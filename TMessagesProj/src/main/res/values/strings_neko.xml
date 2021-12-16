@@ -1,15 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="AppNameNeko" translatable="false">@string/Nekogram</string>
     <string name="Nekogram" translatable="false">Nekogram</string>
     <string name="NekogramBeta" translatable="false">Nekogram Beta</string>
-    <string name="NekogramWithEmoji" translatable="false">&#128566; Nekogram</string>
     <string name="NekogramEmojiDialogs" translatable="false">&#128566;</string>
+    <string name="YahagiLink" translatable="false">https://alpha.yahagi.vip/auth/register?code=neko</string>
+    <string name="YahagiTitle" translatable="false">矢矧网络科</string>
+    <string name="YahagiSummary" translatable="false">您的网络需求一站式解决方案\n解锁地域限制服务 / 数据收集 / 网络加速</string>
     <string name="NekoSettings">Neko Settings</string>
     <string name="IPv6">Try connecting through IPv6</string>
     <string name="MessageMenu">Message menu</string>
     <string name="HidePhone">Hide my phone number</string>
     <string name="Hide">Hide</string>
-    <string name="DeleteAllFromSelf">Delete all from yourself</string>
+    <string name="DeleteAllFromSelf">Delete own messages</string>
     <string name="DeleteAllFromSelfAlert">Warning! This will **delete all messages from you** in this chat for **all** participants.</string>
     <string name="BotLogin">Bot Login</string>
     <string name="InvalidAccessToken">Invalid access token</string>
@@ -19,7 +22,6 @@
     <string name="NameOrder">Name order</string>
     <string name="FirstLast">First Last</string>
     <string name="LastFirst">Last First</string>
-    <string name="TypefaceUseDefault">Use system default font</string>
     <string name="NoQuoteForward">NoQuote forward</string>
     <string name="Repeat">Repeat</string>
     <string name="AddToSavedMessages">Save message</string>
@@ -32,12 +34,9 @@
     <string name="NekogramRunning">Nekogram is running</string>
     <string name="EventType">Sidebar icon set</string>
     <string name="ChristmasHat">Show christmas hat everyday</string>
-    <string name="ActionBarDecoration">Title bar decoration</string>
     <string name="DependsOnDate">Depends on date</string>
     <string name="Christmas">Christmas</string>
     <string name="Valentine">Valentine\'s day</string>
-    <string name="Snowflakes">Snowflakes</string>
-    <string name="Fireworks">Fireworks</string>
     <string name="DeleteDownloadedFile">Delete downloaded file</string>
     <string name="TestBackend">Test Backend</string>
     <string name="TestBackendOn">This account will connect to the test backend.</string>
@@ -50,10 +49,8 @@
     <string name="SensitiveDisableFiltering">Disable sensitive content filtering</string>
     <string name="SensitiveAbout">Display sensitive media in public channels on all your devices.</string>
     <string name="StickerSize">Sticker size</string>
-    <string name="StickerSizeDialogMessageBigOne">A big one</string>
-    <string name="StickerSizeDialogMessageSmallOne">A small one</string>
+    <string name="StickerSizeDialogMessage">Oh so cute! A black cat!</string>
     <string name="StickerSizeDialogMessageReplyTo">Meow</string>
-    <string name="StickerSizeDialogName">Duang</string>
     <string name="Experiment">Experimental</string>
     <string name="UnlimitedFavoredStickers">Unlimited favored stickers</string>
     <string name="UnlimitedFavoredStickersAbout">Add unlimited stickers to favorites. Stickers may not be synchronized to other devices.</string>
@@ -63,11 +60,10 @@
     <string name="TranslateFailed">Translate server error</string>
     <string name="TranslationProvider">Translation provider</string>
     <string name="ProviderGoogleTranslate">Google Translate</string>
-    <string name="ProviderGoogleTranslateCN">Google Translate CN</string>
     <string name="TranslateApiUnsupported">The translation provider you selected don\'t support your language.</string>
     <string name="ProviderLingocloud">Lingocloud</string>
     <string name="UndoTranslate">Undo translate</string>
-    <string name="DisablePhotoViewerSideAction">Disable Flip Photos by tapping</string>
+    <string name="DisablePhotoViewerSideAction">Disable \"Flip Photos by tapping\"</string>
     <string name="BotToken">Token</string>
     <string name="UnlimitedPinnedDialogs">Unlimited pinned dialogs</string>
     <string name="UnlimitedPinnedDialogsAbout">Pin unlimited dialogs by turn their sync off.</string>
@@ -101,9 +97,6 @@
     <string name="OfficialChannelUsername">nekoupdates</string>
     <string name="RestartAppToTakeEffect">Restart the app to take effect.</string>
     <string name="DisableAppBarShadow">Disable title bar shadow</string>
-    <string name="SponsorTitle">dummy</string>
-    <string name="SponsorContent">dummy</string>
-    <string name="BetaWarning">This is a **beta** feature implemented by **Telegram**.</string>
     <string name="MediaPreview">Media preview in dialog list</string>
     <string name="ProviderYandex">Yandex Translate</string>
     <string name="IdType">Chat ID in profile</string>
@@ -122,7 +115,6 @@
     <string name="OpenAllLinksInInstantView">Try to open all links in InstantView</string>
     <string name="DonateThankYou">Thank you!</string>
     <string name="DonateEvilGoogle">Google will take 30 percent of your donation.</string>
-    <string name="DonateAlipay">Alipay</string>
     <string name="formatterDay24HSec">HH:mm:ss</string>
     <string name="formatterDay12HSec">h:mm:ss a</string>
     <string name="FormatWithSeconds">Format time with seconds</string>
@@ -135,15 +127,7 @@
     <string name="LastUpdateRecently">Last successfully checked just now.</string>
     <string name="LastUpdateNever">Never checked since install.</string>
     <string name="CheckingUpdate">Checking for update…</string>
-    <string name="NewUpdateAvailable">A new update available</string>
-    <string name="GuGuGu">Later</string>
-    <string name="DownloadNow">Download now</string>
-    <string name="DownloadingUpdate">Downloading app update</string>
-    <string name="DownloadingUpdateFinish">Downloaded app update, click to install</string>
-    <string name="DownloadingUpdateFail">Downloaded app failed</string>
-    <string name="ClickToRetry">Click to retry.</string>
     <string name="ProviderMicrosoftTranslator">Microsoft Translator</string>
-    <string name="ProviderYouDao">YouDao Translate</string>
     <string name="TranslationProviderShort">Provider</string>
     <string name="ViewSourceCode">View source code</string>
     <string name="AvatarAsBackground">Profile picture as background</string>
@@ -155,4 +139,46 @@
     <string name="SelectBetween">Select between</string>
     <string name="SwipeToPiP">Swipe up video to open PiP</string>
     <string name="StickerSavedHint">Sticker saved to gallery</string>
+    <string name="RegistrationDate">Registration date</string>
+    <string name="WsDescription">Connect to Telegram through WebSocket via Cloudflare, <![CDATA[<a href=\"https://telegra.ph/wsneko-04-10\">technical details</a>]]>.</string>
+    <string name="WsEnableTls">Enable TLS</string>
+    <string name="WsLocalProxy">Local proxy</string>
+    <string name="WsEnableDoh">Enable DoH</string>
+    <string name="UpdateNekogram">Update Nekogram</string>
+    <string name="TranslationTarget">Target language</string>
+    <string name="TranslationTargetApp">Follow app</string>
+    <string name="Translator">Translator</string>
+    <string name="ResetLanguage">Reset language</string>
+    <string name="UseGoogleTranslate">Use Google</string>
+    <string name="DeepLFormality">Formality</string>
+    <string name="DeepLFormalityDefault">Default</string>
+    <string name="DeepLFormalityMore">More</string>
+    <string name="DeepLFormalityLess">Less</string>
+    <string name="InvalidCustomEmojiTypeface">Invalid font file.</string>
+    <string name="AttachWebFile">Web file</string>
+    <string name="WebFileInfo">Send file with URL</string>
+    <string name="SendWebFile">Send web file</string>
+    <string name="SendWebFileInfo">Telegram will download and send the file. 5 MB max size for photos and 20 MB max for other types of content.</string>
+    <string name="SendWebFileInvalid">Invalid file, make sure file is meeting requirements.</string>
+    <string name="AutoLockInstant">Instant</string>
+    <string name="RestrictionReason">Restriction reason</string>
+    <string name="ProviderTencentTranslator">Mr. Translator</string>
+    <string name="ProviderNiuTrans">Niu Trans</string>
+    <string name="MaxRecentStickers">Max recent stickers</string>
+    <string name="ApplyEmojiFont">Apply emoji font</string>
+    <string name="DisableJumpToNextChannel">Disable \"Jump to Next Channel\"</string>
+    <string name="DisableGreetingSticker">Disable greeting sticker</string>
+    <string name="BlockSponsoredMessage">Block sponsored message</string>
+    <string name="DeleteAllFromSelfAdmin">With admin rights</string>
+    <string name="OfficialSite">Official site</string>
+    <string name="MutualContact">Mutual contact</string>
+    <string name="MutualContactDescription">This contact is a mutual contact.</string>
+    <string name="NoUpdateAvailable">No update available.</string>
+    <string name="InviteTextNeko">Hey, I\'m using Nekogram to chat. Join me! Download it here: %1$s</string>
+    <string name="ShareNekogram">Share Nekogram...</string>
+    <string name="NekogramVersion">Nekogram %1$s\nBased on Telegram %2$s\nDesigned by %3$s</string>
+    <string name="UpdateInstalling">Installing update...</string>
+    <string name="UpdateFailedToInstall">Failed to install update: %d</string>
+    <string name="QRLoginMessage">Scan QRCode with another device to login.</string>
+    <string name="QRLoginTitle">QR Login</string>
 </resources>

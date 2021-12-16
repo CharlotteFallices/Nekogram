@@ -13,6 +13,8 @@ import androidx.annotation.UiThread;
 import android.os.SystemClock;
 import android.util.SparseArray;
 
+import com.google.android.exoplayer2.util.Log;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -20,6 +22,8 @@ import java.util.HashSet;
 public class NotificationCenter {
 
     private static int totalEvents = 1;
+
+    public static final int onUpdateLoginToken = totalEvents++;
 
     public static final int didReceiveNewMessages = totalEvents++;
     public static final int updateInterfaces = totalEvents++;
@@ -32,6 +36,9 @@ public class NotificationCenter {
     public static final int commentsRead = totalEvents++;
     public static final int changeRepliesCounter = totalEvents++;
     public static final int messagesDidLoad = totalEvents++;
+    public static final int didLoadSponsoredMessages = totalEvents++;
+    public static final int didLoadSendAsPeers = totalEvents++;
+    public static final int updateDefaultSendAsPeer = totalEvents++;
     public static final int messagesDidLoadWithoutProcess = totalEvents++;
     public static final int loadingMessagesFailed = totalEvents++;
     public static final int messageReceivedByAck = totalEvents++;
@@ -113,6 +120,10 @@ public class NotificationCenter {
     public static final int newSuggestionsAvailable = totalEvents++;
     public static final int didLoadChatInviter = totalEvents++;
     public static final int didLoadChatAdmins = totalEvents++;
+    public static final int historyImportProgressChanged = totalEvents++;
+    public static final int stickersImportProgressChanged = totalEvents++;
+    public static final int stickersImportComplete = totalEvents++;
+    public static final int dialogDeleted = totalEvents++;
 
     public static final int walletPendingTransactionsChanged = totalEvents++;
     public static final int walletSyncProgressChanged = totalEvents++;
@@ -122,12 +133,12 @@ public class NotificationCenter {
 
     public static final int didUpdateConnectionState = totalEvents++;
 
-    public static final int FileDidUpload = totalEvents++;
-    public static final int FileDidFailUpload = totalEvents++;
-    public static final int FileUploadProgressChanged = totalEvents++;
-    public static final int FileLoadProgressChanged = totalEvents++;
-    public static final int fileDidLoad = totalEvents++;
-    public static final int fileDidFailToLoad = totalEvents++;
+    public static final int fileUploaded = totalEvents++;
+    public static final int fileUploadFailed = totalEvents++;
+    public static final int fileUploadProgressChanged = totalEvents++;
+    public static final int fileLoadProgressChanged = totalEvents++;
+    public static final int fileLoaded = totalEvents++;
+    public static final int fileLoadFailed = totalEvents++;
     public static final int filePreparingStarted = totalEvents++;
     public static final int fileNewChunkAvailable = totalEvents++;
     public static final int filePreparingFailed = totalEvents++;
@@ -152,6 +163,10 @@ public class NotificationCenter {
 
     public static final int didStartedCall = totalEvents++;
     public static final int groupCallUpdated = totalEvents++;
+    public static final int groupCallSpeakingUsersUpdated = totalEvents++;
+    public static final int groupCallScreencastStateChanged = totalEvents++;
+    public static final int activeGroupCallsUpdated = totalEvents++;
+    public static final int applyGroupCallVisibleParticipants = totalEvents++;
     public static final int groupCallTypingsUpdated = totalEvents++;
     public static final int didEndCall = totalEvents++;
     public static final int closeInCallActivity = totalEvents++;
@@ -179,7 +194,8 @@ public class NotificationCenter {
     public static final int wallpapersNeedReload = totalEvents++;
     public static final int didReceiveSmsCode = totalEvents++;
     public static final int didReceiveCall = totalEvents++;
-    public static final int emojiDidLoad = totalEvents++;
+    public static final int emojiLoaded = totalEvents++;
+    public static final int invalidateMotionBackground = totalEvents++;
     public static final int closeOtherAppActivities = totalEvents++;
     public static final int cameraInitied = totalEvents++;
     public static final int didReplacedPhotoInMemCache = totalEvents++;
@@ -209,6 +225,11 @@ public class NotificationCenter {
     public static final int voipServiceCreated = totalEvents++;
     public static final int webRtcMicAmplitudeEvent = totalEvents++;
     public static final int webRtcSpeakerAmplitudeEvent = totalEvents++;
+    public static final int showBulletin = totalEvents++;
+    public static final int appUpdateAvailable = totalEvents++;
+    public static final int onDatabaseMigration = totalEvents++;
+    public static final int onEmojiInteractionsReceived = totalEvents++;
+    public static final int emojiPreviewThemesChanged = totalEvents++;
 
     private SparseArray<ArrayList<NotificationCenterDelegate>> observers = new SparseArray<>();
     private SparseArray<ArrayList<NotificationCenterDelegate>> removeAfterBroadcast = new SparseArray<>();
@@ -396,8 +417,12 @@ public class NotificationCenter {
         return currentHeavyOperationFlags;
     }
 
+    public ArrayList<NotificationCenterDelegate> getObservers(int id) {
+        return observers.get(id);
+    }
+
     public void postNotificationName(int id, Object... args) {
-        boolean allowDuringAnimation = id == startAllHeavyOperations || id == stopAllHeavyOperations || id == didReplacedPhotoInMemCache;
+        boolean allowDuringAnimation = id == startAllHeavyOperations || id == stopAllHeavyOperations || id == didReplacedPhotoInMemCache || id == closeChats || id == invalidateMotionBackground;
         ArrayList<Integer> expiredIndices = null;
         if (!allowDuringAnimation && !allowedNotifications.isEmpty()) {
             int size = allowedNotifications.size();
@@ -579,6 +604,10 @@ public class NotificationCenter {
         } else {
             runnable.run();
         }
+    }
+
+    public void removeDelayed(Runnable runnable) {
+        delayedRunnables.remove(runnable);
     }
 
     private static class AllowedNotifications {

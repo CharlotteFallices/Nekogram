@@ -7,21 +7,21 @@ import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.Cursor;
 import android.net.Uri;
-import android.os.Build;
 import android.provider.OpenableColumns;
 import android.text.TextUtils;
-import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.recyclerview.widget.DefaultItemAnimator;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
+import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.R;
@@ -40,17 +40,18 @@ import org.telegram.ui.Cells.TextDetailSettingsCell;
 import org.telegram.ui.Cells.TextInfoPrivacyCell;
 import org.telegram.ui.Cells.TextSettingsCell;
 import org.telegram.ui.Components.AlertsCreator;
+import org.telegram.ui.Components.BulletinFactory;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.RecyclerListView;
-import org.telegram.ui.Components.UndoView;
 
 import java.io.File;
 import java.io.InputStream;
 import java.util.ArrayList;
 
 import tw.nekomimi.nekogram.NekoConfig;
+import tw.nekomimi.nekogram.helpers.PopupHelper;
 
-@SuppressLint("RtlHardcoded")
+@SuppressLint({"RtlHardcoded", "NotifyDataSetChanged"})
 public class NekoExperimentalSettingsActivity extends BaseFragment {
 
     private RecyclerListView listView;
@@ -69,12 +70,13 @@ public class NekoExperimentalSettingsActivity extends BaseFragment {
     private int disableFilteringRow;
     private int unlimitedFavedStickersRow;
     private int unlimitedPinnedDialogsRow;
-    private int deleteAccountRow;
+    private int maxRecentStickersRow;
     private int experiment2Row;
 
+    private int deleteAccountRow;
+    private int blockSponsoredMessageRow;
     private int shouldNOTTrustMeRow;
-
-    private UndoView tooltip;
+    private int hidden2Row;
 
     NekoExperimentalSettingsActivity(boolean sensitiveCanChange, boolean sensitiveEnabled) {
         this.sensitiveCanChange = sensitiveCanChange;
@@ -90,7 +92,6 @@ public class NekoExperimentalSettingsActivity extends BaseFragment {
         return true;
     }
 
-    @SuppressLint("NewApi")
     @Override
     public View createView(Context context) {
         actionBar.setBackButtonImage(R.drawable.ic_ab_back);
@@ -115,25 +116,18 @@ public class NekoExperimentalSettingsActivity extends BaseFragment {
         FrameLayout frameLayout = (FrameLayout) fragmentView;
 
         listView = new RecyclerListView(context);
-        listView.setLayoutManager(new LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false) {
-            @Override
-            public boolean supportsPredictiveItemAnimations() {
-                return false;
-            }
-        });
+        listView.setLayoutManager(new LinearLayoutManager(context, LinearLayoutManager.VERTICAL, false));
         listView.setVerticalScrollBarEnabled(false);
-        listView.setItemAnimator(null);
-        listView.setLayoutAnimation(null);
-        frameLayout.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT, Gravity.TOP | Gravity.LEFT));
         listView.setAdapter(listAdapter);
+        ((DefaultItemAnimator) listView.getItemAnimator()).setDelayAnimations(false);
+        frameLayout.addView(listView, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.MATCH_PARENT));
         listView.setOnItemClickListener((view, position, x, y) -> {
             if (position == saveCacheToExternalFilesDirRow) {
                 NekoConfig.toggleSaveCacheToExternalFilesDir();
                 if (view instanceof TextCheckCell) {
                     ((TextCheckCell) view).setChecked(NekoConfig.saveCacheToExternalFilesDir);
                 }
-                tooltip.setInfoText(LocaleController.formatString("RestartAppToTakeEffect", R.string.RestartAppToTakeEffect));
-                tooltip.showWithAction(0, UndoView.ACTION_CACHE_WAS_CLEARED, null, null);
+                BulletinFactory.of(this).createSimpleBulletin(R.raw.chats_infotip, LocaleController.formatString("RestartAppToTakeEffect", R.string.RestartAppToTakeEffect)).show();
             } else if (position == disableFilteringRow) {
                 sensitiveEnabled = !sensitiveEnabled;
                 TLRPC.TL_account_setContentSettings req = new TLRPC.TL_account_setContentSettings();
@@ -169,7 +163,7 @@ public class NekoExperimentalSettingsActivity extends BaseFragment {
                         if (peer.channel_id != 0) {
                             TLRPC.Chat chat = getMessagesController().getChat(peer.channel_id);
                             if (!chat.broadcast) {
-                                getMessageHelper().deleteUserChannelHistoryWithSearch(TLdialog.id, getMessagesController().getUser(getUserConfig().clientUserId));
+                                getMessageHelper().deleteUserChannelHistoryWithSearch(NekoExperimentalSettingsActivity.this, TLdialog.id, 0);
                             }
                         }
                         if (peer.user_id != 0) {
@@ -244,7 +238,6 @@ public class NekoExperimentalSettingsActivity extends BaseFragment {
                     intent.setType("*/*");
                     startActivityForResult(intent, 36654);
                 }
-
             } else if (position == mapDriftingFixRow) {
                 NekoConfig.toggleMapDriftingFix();
                 if (view instanceof TextCheckCell) {
@@ -255,14 +248,32 @@ public class NekoExperimentalSettingsActivity extends BaseFragment {
                 if (view instanceof TextCheckCell) {
                     ((TextCheckCell) view).setChecked(NekoConfig.increaseVoiceMessageQuality);
                 }
-                tooltip.setInfoText(LocaleController.formatString("RestartAppToTakeEffect", R.string.RestartAppToTakeEffect));
-                tooltip.showWithAction(0, UndoView.ACTION_CACHE_WAS_CLEARED, null, null);
+                BulletinFactory.of(this).createSimpleBulletin(R.raw.chats_infotip, LocaleController.formatString("RestartAppToTakeEffect", R.string.RestartAppToTakeEffect)).show();
+            } else if (position == maxRecentStickersRow) {
+                int[] counts = {20, 30, 40, 50, 80, 100, 120, 150, 180, 200};
+                ArrayList<String> types = new ArrayList<>();
+                for (int count : counts) {
+                    if (count <= getMessagesController().maxRecentStickersCount) {
+                        types.add(String.valueOf(count));
+                    }
+                }
+                PopupHelper.show(types, LocaleController.getString("MaxRecentStickers", R.string.MaxRecentStickers), types.indexOf(String.valueOf(NekoConfig.maxRecentStickers)), context, view, i -> {
+                    NekoConfig.setMaxRecentStickers(Integer.parseInt(types.get(i)));
+                    listAdapter.notifyItemChanged(maxRecentStickersRow);
+                });
+            } else if (position == blockSponsoredMessageRow) {
+                NekoConfig.toggleBlockSponsoredMessage();
+                if (view instanceof TextCheckCell) {
+                    ((TextCheckCell) view).setChecked(NekoConfig.blockSponsoredMessage);
+                }
             }
         });
         listView.setOnItemLongClickListener((view, position) -> {
             if (position == emojiRow) {
                 try {
                     if (NekoConfig.customEmojiFont) NekoConfig.toggleCustomEmojiFont();
+                    //noinspection ResultOfMethodCallIgnored
+                    new File(NekoConfig.customEmojiFontPath).delete();
                     NekoConfig.setCustomEmojiFontPath(null);
                 } catch (Exception e) {
                     //
@@ -271,9 +282,6 @@ public class NekoExperimentalSettingsActivity extends BaseFragment {
             }
             return false;
         });
-
-        tooltip = new UndoView(context);
-        frameLayout.addView(tooltip, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT, Gravity.BOTTOM | Gravity.LEFT, 8, 0, 8, 8));
 
         return fragmentView;
     }
@@ -307,16 +315,19 @@ public class NekoExperimentalSettingsActivity extends BaseFragment {
                 if (uri != null) {
                     try {
                         InputStream os = getParentActivity().getContentResolver().openInputStream(uri);
-                        if (os != null) {
-                            String fileName = getFileName(uri);
-                            File dest = new File(ApplicationLoader.applicationContext.getExternalCacheDir(), fileName == null ? "emoji.ttf" : fileName);
-                            AndroidUtilities.copyFile(os, dest);
-                            NekoConfig.setCustomEmojiFontPath(dest.toString());
+                        String fileName = getFileName(uri);
+                        File dest = new File(ApplicationLoader.applicationContext.getExternalFilesDir(null), fileName == null ? "emoji.ttf" : fileName);
+                        AndroidUtilities.copyFile(os, dest);
+                        if (NekoConfig.setCustomEmojiFontPath(dest.toString())) {
                             if (!NekoConfig.customEmojiFont) NekoConfig.toggleCustomEmojiFont();
+                        } else {
+                            BulletinFactory.of(this).createErrorBulletin(LocaleController.getString("InvalidCustomEmojiTypeface", R.string.InvalidCustomEmojiTypeface)).show();
+                            //noinspection ResultOfMethodCallIgnored
+                            dest.delete();
                         }
                     } catch (Exception e) {
                         FileLog.e(e);
-                        AlertsCreator.createSimpleAlert(getParentActivity(), e.getLocalizedMessage());
+                        AlertsCreator.showSimpleAlert(this, e.getLocalizedMessage());
                     }
                 }
             }
@@ -327,16 +338,26 @@ public class NekoExperimentalSettingsActivity extends BaseFragment {
         rowCount = 0;
 
         experimentRow = rowCount++;
-        emojiRow = Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP ? rowCount++ : -1;
+        emojiRow = rowCount++;
         mapDriftingFixRow = rowCount++;
         increaseVoiceMessageQualityRow = rowCount++;
-        saveCacheToExternalFilesDirRow = rowCount++;
+        saveCacheToExternalFilesDirRow = BuildVars.NO_SCOPED_STORAGE ? rowCount++ : -1;
         disableFilteringRow = sensitiveCanChange ? rowCount++ : -1;
         unlimitedFavedStickersRow = rowCount++;
         unlimitedPinnedDialogsRow = rowCount++;
-        deleteAccountRow = NekoConfig.showHiddenFeature ? rowCount++ : -1;
+        maxRecentStickersRow = rowCount++;
         experiment2Row = rowCount++;
-        shouldNOTTrustMeRow = NekoConfig.showHiddenFeature ? rowCount++ : -1;
+        if (NekoConfig.showHiddenFeature) {
+            deleteAccountRow = rowCount++;
+            blockSponsoredMessageRow = rowCount++;
+            shouldNOTTrustMeRow = rowCount++;
+            hidden2Row = rowCount++;
+        } else {
+            deleteAccountRow = -1;
+            blockSponsoredMessageRow = -1;
+            shouldNOTTrustMeRow = -1;
+            hidden2Row = -1;
+        }
         if (listAdapter != null) {
             listAdapter.notifyDataSetChanged();
         }
@@ -400,7 +421,7 @@ public class NekoExperimentalSettingsActivity extends BaseFragment {
         public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
             switch (holder.getItemViewType()) {
                 case 1: {
-                    if (position == experiment2Row) {
+                    if (position == experiment2Row && hidden2Row == -1 || position == hidden2Row) {
                         holder.itemView.setBackground(Theme.getThemedDrawable(mContext, R.drawable.greydivider_bottom, Theme.key_windowBackgroundGrayShadow));
                     } else {
                         holder.itemView.setBackground(Theme.getThemedDrawable(mContext, R.drawable.greydivider, Theme.key_windowBackgroundGrayShadow));
@@ -411,10 +432,12 @@ public class NekoExperimentalSettingsActivity extends BaseFragment {
                     TextSettingsCell textCell = (TextSettingsCell) holder.itemView;
                     textCell.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteBlackText));
                     if (position == deleteAccountRow) {
-                        textCell.setText(LocaleController.getString("DeleteAccount", R.string.DeleteAccount), false);
+                        textCell.setText(LocaleController.getString("DeleteAccount", R.string.DeleteAccount), true);
                         textCell.setTextColor(Theme.getColor(Theme.key_windowBackgroundWhiteRedText));
                     } else if (position == emojiRow) {
                         textCell.setText(LocaleController.getString("CustomEmojiTypeface", R.string.CustomEmojiTypeface), true);
+                    } else if (position == maxRecentStickersRow) {
+                        textCell.setTextAndValue(LocaleController.getString("MaxRecentStickers", R.string.MaxRecentStickers), String.valueOf(NekoConfig.maxRecentStickers), false);
                     }
                     break;
                 }
@@ -429,13 +452,15 @@ public class NekoExperimentalSettingsActivity extends BaseFragment {
                     } else if (position == unlimitedFavedStickersRow) {
                         textCell.setTextAndValueAndCheck(LocaleController.getString("UnlimitedFavoredStickers", R.string.UnlimitedFavoredStickers), LocaleController.getString("UnlimitedFavoredStickersAbout", R.string.UnlimitedFavoredStickersAbout), NekoConfig.unlimitedFavedStickers, true, true);
                     } else if (position == unlimitedPinnedDialogsRow) {
-                        textCell.setTextAndValueAndCheck(LocaleController.getString("UnlimitedPinnedDialogs", R.string.UnlimitedPinnedDialogs), LocaleController.getString("UnlimitedPinnedDialogsAbout", R.string.UnlimitedPinnedDialogsAbout), NekoConfig.unlimitedPinnedDialogs, true, deleteAccountRow != -1);
+                        textCell.setTextAndValueAndCheck(LocaleController.getString("UnlimitedPinnedDialogs", R.string.UnlimitedPinnedDialogs), LocaleController.getString("UnlimitedPinnedDialogsAbout", R.string.UnlimitedPinnedDialogsAbout), NekoConfig.unlimitedPinnedDialogs, true, true);
                     } else if (position == mapDriftingFixRow) {
                         textCell.setTextAndCheck(LocaleController.getString("MapDriftingFix", R.string.MapDriftingFix), NekoConfig.mapDriftingFix, true);
                     } else if (position == increaseVoiceMessageQualityRow) {
                         textCell.setTextAndCheck(LocaleController.getString("IncreaseVoiceMessageQuality", R.string.IncreaseVoiceMessageQuality), NekoConfig.increaseVoiceMessageQuality, true);
                     } else if (position == shouldNOTTrustMeRow) {
                         textCell.setTextAndCheck("", NekoConfig.shouldNOTTrustMe, false);
+                    } else if (position == blockSponsoredMessageRow) {
+                        textCell.setTextAndCheck(LocaleController.getString("BlockSponsoredMessage", R.string.BlockSponsoredMessage), NekoConfig.blockSponsoredMessage, true);
                     }
                     break;
                 }
@@ -502,7 +527,7 @@ public class NekoExperimentalSettingsActivity extends BaseFragment {
 
         @Override
         public int getItemViewType(int position) {
-            if (position == experiment2Row) {
+            if (position == experiment2Row || position == hidden2Row) {
                 return 1;
             } else if (position == deleteAccountRow) {
                 return 2;
@@ -512,7 +537,7 @@ public class NekoExperimentalSettingsActivity extends BaseFragment {
                 return 4;
             } else if (position == emojiRow) {
                 return TextUtils.isEmpty(NekoConfig.customEmojiFontPath) ? 2 : 5;
-            } else if (position == shouldNOTTrustMeRow) {
+            } else if (position == shouldNOTTrustMeRow || position == blockSponsoredMessageRow) {
                 return 3;
             }
             return 2;

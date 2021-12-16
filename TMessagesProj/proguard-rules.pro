@@ -97,7 +97,20 @@
 # Use -keep to explicitly keep any other classes shrinking would remove
 #-dontoptimize
 #-dontobfuscate
--keepnames class org.telegram.ui.* { *; }
--keepnames class org.telegram.ui.Cells.* { *; }
--keepnames class tw.nekomimi.nekogram.MessageDetailsActivity { }
--keepnames class tw.nekomimi.nekogram.settings.* extends org.telegram.ui.ActionBar.BaseFragment { }
+# Themimg and settings search are using refelctions
+-keepclassmembernames class org.telegram.ui.* { *; }
+-keepclassmembernames class org.telegram.ui.Cells.* { *; }
+-keepclassmembernames class org.telegram.ui.Components.* { *; }
+-keepclasseswithmembernames,includedescriptorclasses class * {
+    native <methods>;
+}
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+
+-dontwarn org.jetbrains.annotations.NotNull
+-dontwarn org.jetbrains.annotations.Nullable
+
+-repackageclasses
+-allowaccessmodification
+-overloadaggressively
