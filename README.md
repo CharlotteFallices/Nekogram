@@ -26,7 +26,7 @@ Nekogram派生于Telegram,因此我们遵循了[Telegram的本地化规则](http
 而对于Nekogram中特有的内容,我们以[Crowdin](https://neko.crowdin.com/nekogram)来开展本地化工作,希望您也可以帮助我们将Nekogram推向世界.
 - 请务必在翻译时使用一些可可爱爱的语气!
 
-## 关于
+## 贡献者
 
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
 | [<img src="https://secure.gravatar.com/avatar/9c9ca018719cd903fc16d6d0d81cf090" width="80px;"/><br /><sub>猫耳逆变器</sub>](https://github.com/NekoInverter)<br />[💻](https://github.com/Nekogram/Nekogram/commits?author=NekoInverter "Code") | [<img src="https://avatars1.githubusercontent.com/u/18373361?s=460&v=4" width="80px;"/><br /><sub>梨子</sub>](https://github.com/rikakomoe)<br />[💻](https://github.com/Nekogram/Nekogram/commits?author=rikakomoe "Code") | [<img src="https://i.loli.net/2020/01/17/e9Z5zkG7lNwUBPE.jpg" width="80px;"/><br /><sub>呆瓜</sub>](https://t.me/Duang)<br /> [🎨](#design-duang "Design") |
