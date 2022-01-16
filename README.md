@@ -15,7 +15,7 @@ Nekogram是一只非官方的Telegram客户端,**Nekogram不是[NekoX](https://g
 1. 克隆该项目至本地.
 2. 将你的`release.keystore`拷贝至`TMessagesProj/config`.
 3. 在`local.properties`中填写`RELEASE_KEY_PASSWORD`,`RELEASE_KEY_ALIAS`与`RELEASE_STORE_PASSWORD`以载入你的`release.keystore`.
-4. 在`Google Firebase`中分别创建ID为`tw.nekomimi.nekogram`与`tw.nekomimi.nekogram.beta`的应用,启用`firebase messaging`并将`download google-services.json`拷贝至`TMessagesProj`目录中.
+4. 在`Google Firebase`中分别创建ID为`tw.nekomimi.nekogram`与`tw.nekomimi.nekogram.beta`的应用,启用`firebase messaging`并将`download google-services.json`拷贝至`TMessagesProj`目录中.这样做的目的是为了使用Google的推送服务,因此你需要遵守Google的[Tos](https://firebase.google.com/terms/),或者你可以改用其它厂家的推送服务.
 5. 在你的IDE中打开(**而不是载入**)这个项目.
 6. 填写`TMessagesProj/src/main/java/tw/nekomimi/nekogram/Extra.java`中的每一项,它们将指定一些用于获取各个数据的链接.
 7. 编译
