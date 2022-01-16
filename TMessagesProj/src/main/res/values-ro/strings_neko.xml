@@ -46,7 +46,6 @@
     <string name="UnlimitedFavoredStickers">Stickere favorite nelimitate</string>
     <string name="UnlimitedFavoredStickersAbout">Adăugați stickere nelimitate la favorite. Este posibil ca stickerele să nu fie sincronizate cu alte dispozitive.</string>
     <string name="MessageDetails">Detalii</string>
-    <string name="Translate">Traducere</string>
     <string name="DeleteAccount">Ștergeți contul Telegram</string>
     <string name="TranslateFailed">Eroare server de traducere</string>
     <string name="TranslationProvider">Furnizor de traduceri</string>
@@ -59,8 +58,6 @@
     <string name="UnlimitedPinnedDialogsAbout">Fixați dialoguri nelimitate dezactivând sincronizarea lor.</string>
     <string name="OpenArchiveOnPull">Deschideți arhiva la tragere</string>
     <string name="HideKeyboardOnChatScroll">Ascundeți tastatura pe derularea conversațiilor</string>
-    <string name="UserRestrictionsSendStickers2">Trimiteți stickere</string>
-    <string name="UserRestrictionsSendGifs">Trimiteți GIF-uri</string>
     <string name="ShowTabsOnForward">Afișați filele pe înainte</string>
     <string name="CheckAllAdministrated">Adăugați administrator</string>
     <string name="RearVideoMessages">Camera din spate în mesajele video</string>
@@ -143,4 +140,5 @@
     <string name="DeepLFormalityMore">Mai multe</string>
     <string name="DeepLFormalityLess">Mai puține</string>
     <string name="InvalidCustomEmojiTypeface">Fișier font invalid.</string>
+    <!-- Accessibility -->
 </resources>

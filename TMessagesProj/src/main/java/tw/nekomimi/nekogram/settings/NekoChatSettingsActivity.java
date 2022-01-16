@@ -1,5 +1,6 @@
 package tw.nekomimi.nekogram.settings;
 
+import android.animation.ValueAnimator;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Canvas;
@@ -54,6 +55,7 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
     private RecyclerListView listView;
     private ListAdapter listAdapter;
     private ActionBarMenuItem resetItem;
+    private StickerSizeCell stickerSizeCell;
 
     private int rowCount;
 
@@ -72,6 +74,7 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
     private int swipeToPiPRow;
     private int disableJumpToNextRow;
     private int disableGreetingStickerRow;
+    private int disableVoiceMessageAutoPlayRow;
     private int autoPauseVideoRow;
     private int messageMenuRow;
     private int chat2Row;
@@ -107,9 +110,14 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
         resetItem.setVisibility(NekoConfig.stickerSize != 14.0f ? View.VISIBLE : View.GONE);
         resetItem.setTag(null);
         resetItem.setOnClickListener(v -> {
-            NekoConfig.setStickerSize(14.0f);
             AndroidUtilities.updateViewVisibilityAnimated(resetItem, false, 0.5f, true);
-            listAdapter.notifyItemChanged(stickerSizeRow, new Object());
+            ValueAnimator animator = ValueAnimator.ofFloat(NekoConfig.stickerSize, 14.0f);
+            animator.setDuration(150);
+            animator.addUpdateListener(valueAnimator -> {
+                NekoConfig.setStickerSize((Float) valueAnimator.getAnimatedValue());
+                stickerSizeCell.invalidate();
+            });
+            animator.start();
         });
 
         actionBar.setActionBarMenuOnItemClick(new ActionBar.ActionBarMenuOnItemClick() {
@@ -217,6 +225,11 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
                 if (view instanceof TextCheckCell) {
                     ((TextCheckCell) view).setChecked(NekoConfig.disableGreetingSticker);
                 }
+            } else if (position == disableVoiceMessageAutoPlayRow) {
+                NekoConfig.toggleDisableVoiceMessageAutoPlay();
+                if (view instanceof TextCheckCell) {
+                    ((TextCheckCell) view).setChecked(NekoConfig.disableVoiceMessageAutoPlay);
+                }
             }
         });
 
@@ -248,6 +261,7 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
         swipeToPiPRow = rowCount++;
         disableJumpToNextRow = rowCount++;
         disableGreetingStickerRow = rowCount++;
+        disableVoiceMessageAutoPlayRow = rowCount++;
         autoPauseVideoRow = rowCount++;
         messageMenuRow = rowCount++;
         chat2Row = rowCount++;
@@ -319,7 +333,7 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
         linearLayoutInviteContainer.setOrientation(LinearLayout.VERTICAL);
         linearLayout.addView(linearLayoutInviteContainer, LayoutHelper.createLinear(LayoutHelper.MATCH_PARENT, LayoutHelper.WRAP_CONTENT));
 
-        int count = 11;
+        int count = 12;
         for (int a = 0; a < count; a++) {
             TextCheckCell textCell = new TextCheckCell(context);
             switch (a) {
@@ -348,7 +362,7 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
                     break;
                 }
                 case 6: {
-                    textCell.setTextAndCheck(LocaleController.getString("Translate", R.string.Translate), NekoConfig.showTranslate, false);
+                    textCell.setTextAndCheck(LocaleController.getString("TranslateMessage", R.string.TranslateMessage), NekoConfig.showTranslate, false);
                     break;
                 }
                 case 7: {
@@ -365,6 +379,10 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
                 }
                 case 10: {
                     textCell.setTextAndCheck(LocaleController.getString("MessageDetails", R.string.MessageDetails), NekoConfig.showMessageDetails, false);
+                    break;
+                }
+                case 11: {
+                    textCell.setTextAndCheck(LocaleController.getString("CopyPhoto", R.string.CopyPhoto), NekoConfig.showCopyPhoto, false);
                     break;
                 }
             }
@@ -427,6 +445,11 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
                     case 10: {
                         NekoConfig.toggleShowMessageDetails();
                         textCell.setChecked(NekoConfig.showMessageDetails);
+                        break;
+                    }
+                    case 11: {
+                        NekoConfig.toggleShowCopyPhoto();
+                        textCell.setChecked(NekoConfig.showCopyPhoto);
                         break;
                     }
                 }
@@ -515,6 +538,7 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
         @Override
         public void invalidate() {
             super.invalidate();
+            lastWidth = -1;
             messagesCell.invalidate();
             sizeBar.invalidate();
         }
@@ -610,6 +634,8 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
                         textCell.setTextAndCheck(LocaleController.getString("DisableJumpToNextChannel", R.string.DisableJumpToNextChannel), NekoConfig.disableJumpToNextChannel, true);
                     } else if (position == disableGreetingStickerRow) {
                         textCell.setTextAndCheck(LocaleController.getString("DisableGreetingSticker", R.string.DisableGreetingSticker), NekoConfig.disableGreetingSticker, true);
+                    } else if (position == disableVoiceMessageAutoPlayRow) {
+                        textCell.setTextAndCheck(LocaleController.getString("DisableVoiceMessagesAutoPlay", R.string.DisableVoiceMessagesAutoPlay), NekoConfig.disableVoiceMessageAutoPlay, true);
                     }
                     break;
                 }
@@ -674,7 +700,7 @@ public class NekoChatSettingsActivity extends BaseFragment implements Notificati
                     view.setBackground(Theme.getThemedDrawable(mContext, R.drawable.greydivider, Theme.key_windowBackgroundGrayShadow));
                     break;
                 case 8:
-                    view = new StickerSizeCell(mContext);
+                    view = stickerSizeCell = new StickerSizeCell(mContext);
                     view.setBackgroundColor(Theme.getColor(Theme.key_windowBackgroundWhite));
                     break;
             }

@@ -46,7 +46,6 @@
     <string name="UnlimitedFavoredStickers">අසීමිත කැමති ස්ටිකර්</string>
     <string name="UnlimitedFavoredStickersAbout">ඔබගේ කැමැත්තට අනුව අසීමිත ස්ටිකර එකතු කරන්න. මේවා අනෙක් උපාංග සමග sync නොවේ.</string>
     <string name="MessageDetails">විස්තර</string>
-    <string name="Translate">පරිවර්තන</string>
     <string name="DeleteAccount">ටෙලිග්‍රෑම් ගිණුම මකා දමන්න</string>
     <string name="TranslateFailed">පරිවර්තන සේවාදායකාගේ දෝෂයක්</string>
     <string name="TranslationProvider">පරිවර්තන සේවාදායකයා</string>
@@ -59,8 +58,6 @@
     <string name="UnlimitedPinnedDialogsAbout">මෙමගින් එම පින් කරන ලද දෙබස් උපාංග අතර sync වීම වළකයි.</string>
     <string name="OpenArchiveOnPull">සංරක්ෂිතය විවෘත කිරීමට පහළට අදින්න</string>
     <string name="HideKeyboardOnChatScroll">කතාබස නරඹන විටදී යතුරු පුවරුව සඟවන්න</string>
-    <string name="UserRestrictionsSendStickers2">ස්ටිකර යවන්න</string>
-    <string name="UserRestrictionsSendGifs">GIF යවන්න</string>
     <string name="ShowTabsOnForward">Show tabs on forward</string>
     <string name="CheckAllAdministrated">පරිපාලනයට යොදවන්න</string>
     <string name="RearVideoMessages">විඩීයෝ මැසේජ සදහා පසුපස කැමරාව භාවිතා කරන්න</string>
@@ -87,4 +84,5 @@
     <string name="RestartAppToTakeEffect">මෙය ක්‍රියාත්මක වීම සදහා ඇප් එක නැවත ක්‍රියාත්මක කරන්න.</string>
     <string name="DisableAppBarShadow">මාතෘකා තීරු සෙවනැල්ල අක්‍රීය කරන්න</string>
     <string name="IdTypeHidden">හංගන්න</string>
+    <!-- Accessibility -->
 </resources>

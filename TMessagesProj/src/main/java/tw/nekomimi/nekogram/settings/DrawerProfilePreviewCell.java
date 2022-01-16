@@ -10,6 +10,7 @@ import org.telegram.ui.Cells.DrawerProfileCell;
 public class DrawerProfilePreviewCell extends DrawerProfileCell {
     public DrawerProfilePreviewCell(Context context) {
         super(context);
+        setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
     }
 
     @Override

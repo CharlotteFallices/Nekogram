@@ -8,6 +8,7 @@ import android.os.Build;
 import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.accessibility.AccessibilityManager;
 import android.widget.FrameLayout;
 
 import androidx.annotation.NonNull;
@@ -16,8 +17,8 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import org.telegram.messenger.AndroidUtilities;
+import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.LocaleController;
-import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
@@ -45,15 +46,16 @@ import org.telegram.ui.LaunchActivity;
 import java.util.ArrayList;
 
 import tw.nekomimi.nekogram.NekoConfig;
-import tw.nekomimi.nekogram.helpers.NewsHelper;
-import tw.nekomimi.nekogram.helpers.UpdateHelper;
+import tw.nekomimi.nekogram.accessibility.AccessibilitySettingsActivity;
+import tw.nekomimi.nekogram.helpers.remote.ConfigHelper;
+import tw.nekomimi.nekogram.helpers.remote.UpdateHelper;
 
 @SuppressLint({"RtlHardcoded", "NotifyDataSetChanged"})
 public class NekoSettingsActivity extends BaseFragment implements NotificationCenter.NotificationCenterDelegate {
 
     private RecyclerListView listView;
     private ListAdapter listAdapter;
-    private final ArrayList<NewsHelper.NewsItem> news = NewsHelper.getNews();
+    private final ArrayList<ConfigHelper.NewsItem> news = ConfigHelper.getNews();
 
     private boolean sensitiveCanChange = false;
     private boolean sensitiveEnabled = false;
@@ -65,6 +67,7 @@ public class NekoSettingsActivity extends BaseFragment implements NotificationCe
     private int generalRow;
     private int chatRow;
     private int experimentRow;
+    private int accessibilityRow;
     private int categories2Row;
 
     private int aboutRow;
@@ -139,8 +142,10 @@ public class NekoSettingsActivity extends BaseFragment implements NotificationCe
                 presentFragment(new NekoGeneralSettingsActivity());
             } else if (position == experimentRow) {
                 presentFragment(new NekoExperimentalSettingsActivity(sensitiveCanChange, sensitiveEnabled));
+            } else if (position == accessibilityRow) {
+                presentFragment(new AccessibilitySettingsActivity());
             } else if (position == channelRow) {
-                MessagesController.getInstance(currentAccount).openByUserName(LocaleController.getString("OfficialChannelUsername", R.string.OfficialChannelUsername), this, 1);
+                getMessagesController().openByUserName(LocaleController.getString("OfficialChannelUsername", R.string.OfficialChannelUsername), this, 1);
             } else if (position == translationRow) {
                 Browser.openUrl(getParentActivity(), "https://neko.crowdin.com/nekogram");
             } else if (position == websiteRow) {
@@ -152,7 +157,7 @@ public class NekoSettingsActivity extends BaseFragment implements NotificationCe
                 checkingUpdate = true;
                 listAdapter.notifyItemChanged(checkUpdateRow);
             } else if (position >= sponsorRow && position < sponsor2Row) {
-                NewsHelper.NewsItem item = news.get(position - sponsorRow);
+                ConfigHelper.NewsItem item = news.get(position - sponsorRow);
                 Browser.openUrl(getParentActivity(), item.url);
             }
         });
@@ -196,6 +201,12 @@ public class NekoSettingsActivity extends BaseFragment implements NotificationCe
         generalRow = rowCount++;
         chatRow = rowCount++;
         experimentRow = rowCount++;
+        AccessibilityManager am = (AccessibilityManager) ApplicationLoader.applicationContext.getSystemService(Context.ACCESSIBILITY_SERVICE);
+        if (am != null && am.isTouchExplorationEnabled()) {
+            accessibilityRow = rowCount++;
+        } else {
+            accessibilityRow = -1;
+        }
         categories2Row = rowCount++;
 
         aboutRow = rowCount++;
@@ -307,7 +318,9 @@ public class NekoSettingsActivity extends BaseFragment implements NotificationCe
                     } else if (position == generalRow) {
                         textCell.setTextAndIcon(LocaleController.getString("General", R.string.General), R.drawable.msg_theme, true);
                     } else if (position == experimentRow) {
-                        textCell.setTextAndIcon(LocaleController.getString("Experiment", R.string.Experiment), R.drawable.msg_fave, false);
+                        textCell.setTextAndIcon(LocaleController.getString("Experiment", R.string.Experiment), R.drawable.msg_fave, accessibilityRow != -1);
+                    } else if (position == accessibilityRow) {
+                        textCell.setText(LocaleController.getString("AccessibilitySettings", R.string.AccessibilitySettings), false);
                     }
                     break;
                 }
@@ -341,7 +354,7 @@ public class NekoSettingsActivity extends BaseFragment implements NotificationCe
                                 checkingUpdate ? LocaleController.getString("CheckingUpdate", R.string.CheckingUpdate) :
                                         UpdateHelper.formatDateUpdate(SharedConfig.lastUpdateCheckTime), position + 1 != about2Row);
                     } else if (position >= sponsorRow && position < sponsor2Row) {
-                        NewsHelper.NewsItem item = news.get(position - sponsorRow);
+                        ConfigHelper.NewsItem item = news.get(position - sponsorRow);
                         textCell.setTextAndValue(item.title, item.summary, position + 1 != sponsor2Row);
                     }
                     break;

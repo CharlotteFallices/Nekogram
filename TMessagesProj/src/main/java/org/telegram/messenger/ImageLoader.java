@@ -14,14 +14,10 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.pm.ApplicationInfo;
-import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Matrix;
 import android.graphics.drawable.BitmapDrawable;
-import androidx.exifinterface.media.ExifInterface;
-
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -32,7 +28,7 @@ import android.provider.MediaStore;
 import android.text.TextUtils;
 import android.util.SparseArray;
 
-import com.google.android.exoplayer2.util.Log;
+import androidx.exifinterface.media.ExifInterface;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -363,7 +359,7 @@ public class ImageLoader {
                         }
                     }
                 } catch (Exception e) {
-                    FileLog.e(e);
+                    FileLog.e(e, false);
                 }
                 httpConnectionStream = httpConnection.getInputStream();
 
@@ -855,7 +851,7 @@ public class ImageLoader {
                         float h_filter = Float.parseFloat(args[1]);
                         w = Math.min(512, (int) (w_filter * AndroidUtilities.density));
                         h = Math.min(512, (int) (h_filter * AndroidUtilities.density));
-                        if (w_filter <= 90 && h_filter <= 90) {
+                        if (w_filter <= 90 && h_filter <= 90 && !cacheImage.filter.contains("nolimit")) {
                             w = Math.min(w, 160);
                             h = Math.min(h, 160);
                             limitFps = true;
@@ -863,7 +859,7 @@ public class ImageLoader {
                         if (args.length >= 3 && "pcache".equals(args[2])) {
                             precache = true;
                         } else {
-                            precache = SharedConfig.getDevicePerformanceClass() != SharedConfig.PERFORMANCE_CLASS_HIGH;
+                            precache = !cacheImage.filter.contains("nolimit") && SharedConfig.getDevicePerformanceClass() != SharedConfig.PERFORMANCE_CLASS_HIGH;
                         }
                     }
 
@@ -1983,45 +1979,7 @@ public class ImageLoader {
 
         try {
             if (Environment.MEDIA_MOUNTED.equals(Environment.getExternalStorageState())) {
-                File path = NekoConfig.saveCacheToExternalFilesDir ? ApplicationLoader.applicationContext.getExternalFilesDir(null) : Environment.getExternalStorageDirectory();
-                if (Build.VERSION.SDK_INT >= 19 && !TextUtils.isEmpty(SharedConfig.storageCacheDir)) {
-                    ArrayList<File> dirs = AndroidUtilities.getRootDirs();
-                    if (dirs != null) {
-                        for (int a = 0, N = dirs.size(); a < N; a++) {
-                            File dir = dirs.get(a);
-                            if (dir.getAbsolutePath().startsWith(SharedConfig.storageCacheDir)) {
-                                path = dir;
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                if (Build.VERSION.SDK_INT >= 30) {
-                    File newPath = ApplicationLoader.applicationContext.getExternalFilesDir(null);
-                    telegramPath = new File(newPath, "Telegram");
-//                    File oldPath = new File(path, "Telegram");
-//                    long moveStart = System.currentTimeMillis();
-//                    moveDirectory(oldPath, telegramPath);
-//                    long dt = System.currentTimeMillis() - moveStart;
-//                    FileLog.d("move time = " + dt);
-                } else {
-                    telegramPath = new File(path, "Telegram");
-                }
-                telegramPath.mkdirs();
-
-                if (Build.VERSION.SDK_INT >= 19 && !telegramPath.isDirectory()) {
-                    ArrayList<File> dirs = AndroidUtilities.getDataDirs();
-                    for (int a = 0, N = dirs.size(); a < N; a++) {
-                        File dir = dirs.get(a);
-                        if (dir.getAbsolutePath().startsWith(SharedConfig.storageCacheDir)) {
-                            path = dir;
-                            telegramPath = new File(path, "Telegram");
-                            telegramPath.mkdirs();
-                            break;
-                        }
-                    }
-                }
+                telegramPath = NekoConfig.getTelegramPath();
 
                 if (telegramPath.isDirectory()) {
                     try {

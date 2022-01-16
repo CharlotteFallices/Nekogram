@@ -47,7 +47,6 @@
     <string name="UnlimitedFavoredStickers">無限的收藏貼圖</string>
     <string name="UnlimitedFavoredStickersAbout">向收藏夾添加無限貼圖，貼圖可能將不能同步到其它裝置。</string>
     <string name="MessageDetails">資訊</string>
-    <string name="Translate">翻譯</string>
     <string name="DeleteAccount">刪除 Telegram 帳戶</string>
     <string name="TranslateFailed">翻譯服務器錯誤</string>
     <string name="TranslationProvider">翻譯源</string>
@@ -60,8 +59,6 @@
     <string name="UnlimitedPinnedDialogsAbout">關閉同步以置頂無限對話。</string>
     <string name="OpenArchiveOnPull">下拉開啟已封存對話</string>
     <string name="HideKeyboardOnChatScroll">當滾動瀏覽對話時隱藏鍵盤</string>
-    <string name="UserRestrictionsSendStickers2">傳送貼圖</string>
-    <string name="UserRestrictionsSendGifs">發送動圖</string>
     <string name="ShowTabsOnForward">在轉傳的頁面中顯示標籤</string>
     <string name="CheckAllAdministrated">新增管理員</string>
     <string name="RearVideoMessages">視頻消息中使用後置攝像頭</string>
@@ -82,4 +79,5 @@
     <string name="ProviderYandex">Yandex 翻譯</string>
     <string name="IdTypeHidden">隱藏</string>
     <string name="Page1Message2">Nekogram 是使用 Telegram API\n的**非官方**應用</string>
+    <!-- Accessibility -->
 </resources>

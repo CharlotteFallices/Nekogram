@@ -27,6 +27,9 @@
 -keep class com.google.android.exoplayer2.metadata.flac.PictureFrame { *; }
 -keep class com.google.android.exoplayer2.decoder.SimpleOutputBuffer { *; }
 
+# https://developers.google.com/ml-kit/known-issues#android_issues
+-keep class com.google.mlkit.nl.languageid.internal.LanguageIdentificationJni { *; }
+
 # Constant folding for resource integers may mean that a resource passed to this method appears to be unused. Keep the method to prevent this from happening.
 -keep class com.google.android.exoplayer2.upstream.RawResourceDataSource {
   public static android.net.Uri buildRawResourceUri(int);
@@ -94,18 +97,25 @@
 -dontwarn org.checkerframework.**
 -dontwarn javax.annotation.**
 
-# Use -keep to explicitly keep any other classes shrinking would remove
-#-dontoptimize
-#-dontobfuscate
+-assumenosideeffects class android.util.Log {
+    public static *** v(...);
+    public static *** d(...);
+}
+
 # Themimg and settings search are using refelctions
 -keepclassmembernames class org.telegram.ui.* { *; }
 -keepclassmembernames class org.telegram.ui.Cells.* { *; }
 -keepclassmembernames class org.telegram.ui.Components.* { *; }
+
 -keepclasseswithmembernames,includedescriptorclasses class * {
     native <methods>;
 }
 -keepclassmembers class * {
     @android.webkit.JavascriptInterface <methods>;
+}
+-keepclassmembernames class tw.nekomimi.nekogram.settings.NekoGeneralSettingsActivity {
+    private org.telegram.ui.Components.RecyclerListView listView;
+    private int translatorTypeRow;
 }
 
 -dontwarn org.jetbrains.annotations.NotNull

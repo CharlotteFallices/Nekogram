@@ -60,6 +60,13 @@ import android.util.SparseArray;
 import android.util.StateSet;
 import android.view.View;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.annotation.UiThread;
+import androidx.core.graphics.ColorUtils;
+
+import com.google.android.exoplayer2.util.Log;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.telegram.messenger.AndroidUtilities;
@@ -77,13 +84,13 @@ import org.telegram.messenger.MessagesController;
 import org.telegram.messenger.NotificationCenter;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
+import org.telegram.messenger.SvgHelper;
 import org.telegram.messenger.UserConfig;
 import org.telegram.messenger.Utilities;
 import org.telegram.messenger.time.SunDate;
 import org.telegram.tgnet.ConnectionsManager;
 import org.telegram.tgnet.SerializedData;
 import org.telegram.tgnet.TLRPC;
-import org.telegram.ui.Cells.ThemesHorizontalListCell;
 import org.telegram.ui.Components.AudioVisualizerDrawable;
 import org.telegram.ui.Components.BackgroundGradientDrawable;
 import org.telegram.ui.Components.ChatThemeBottomSheet;
@@ -100,7 +107,6 @@ import org.telegram.ui.Components.RoundStatusDrawable;
 import org.telegram.ui.Components.ScamDrawable;
 import org.telegram.ui.Components.SendingFileDrawable;
 import org.telegram.ui.Components.StatusDrawable;
-import org.telegram.messenger.SvgHelper;
 import org.telegram.ui.Components.ThemeEditorView;
 import org.telegram.ui.Components.TypingDotsDrawable;
 import org.telegram.ui.RoundVideoProgressShadow;
@@ -122,11 +128,6 @@ import java.util.HashSet;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
-
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.annotation.UiThread;
-import androidx.core.graphics.ColorUtils;
 
 import tw.nekomimi.nekogram.NekoConfig;
 
@@ -2422,7 +2423,7 @@ public class Theme {
 
         public boolean createBackground(File file, String toPath) {
             try {
-                Bitmap bitmap = ThemesHorizontalListCell.getScaledBitmap(AndroidUtilities.dp(640), AndroidUtilities.dp(360), file.getAbsolutePath(), null, 0);
+                Bitmap bitmap = AndroidUtilities.getScaledBitmap(AndroidUtilities.dp(640), AndroidUtilities.dp(360), file.getAbsolutePath(), null, 0);
                 if (bitmap != null && patternBgColor != 0) {
                     Bitmap finalBitmap = Bitmap.createBitmap(bitmap.getWidth(), bitmap.getHeight(), bitmap.getConfig());
                     Canvas canvas = new Canvas(finalBitmap);
@@ -3682,6 +3683,14 @@ public class Theme {
     public final static String key_statisticChartLine_indigo = "statisticChartLine_indigo";
     public final static String key_statisticChartLineEmpty = "statisticChartLineEmpty";
 
+    public static final String key_chat_outReactionButtonBackground = "chat_outReactionButtonBackground";
+    public static final String key_chat_inReactionButtonBackground = "chat_inReactionButtonBackground";
+    public static final String key_chat_outReactionButtonText = "chat_outReactionButtonText";
+    public static final String key_chat_inReactionButtonText = "chat_inReactionButtonText";
+    public static final String key_chat_inReactionButtonTextSelected = "chat_inReactionButtonTextSelected";
+    public static final String key_chat_outReactionButtonTextSelected = "chat_outReactionButtonTextSelected";
+
+
     public static final String key_drawable_botInline = "drawableBotInline";
     public static final String key_drawable_botLink = "drawableBotLink";
     public static final String key_drawable_commentSticker = "drawableCommentSticker";
@@ -3728,6 +3737,8 @@ public class Theme {
     public static final String key_drawable_lockIconDrawable = "drawableLockIcon";
     public static final String key_drawable_chat_pollHintDrawableOut = "drawable_chat_pollHintDrawableOut";
     public static final String key_drawable_chat_pollHintDrawableIn = "drawable_chat_pollHintDrawableIn";
+
+
     private static final HashMap<String, Drawable> defaultChatDrawables = new HashMap<>();
     private static final HashMap<String, String> defaultChatDrawableColorKeys = new HashMap<>();
 
@@ -4534,6 +4545,13 @@ public class Theme {
         defaultColors.put(key_voipgroup_windowBackgroundWhiteInputField, 0xffdbdbdb);
         defaultColors.put(key_voipgroup_windowBackgroundWhiteInputFieldActivated, 0xff37a9f0);
 
+        defaultColors.put(key_chat_outReactionButtonBackground, 0xff78c272);
+        defaultColors.put(key_chat_inReactionButtonBackground, 0xff72b5e8);
+        defaultColors.put(key_chat_inReactionButtonText, 0xff3a8ccf);
+        defaultColors.put(key_chat_outReactionButtonText, 0xff55ab4f);
+        defaultColors.put(key_chat_inReactionButtonTextSelected, 0xffffffff);
+        defaultColors.put(key_chat_outReactionButtonTextSelected, 0xffffffff);
+
 
         fallbackKeys.put(key_chat_inAdminText, key_chat_inTimeText);
         fallbackKeys.put(key_chat_inAdminSelectedText, key_chat_inTimeSelectedText);
@@ -4669,6 +4687,13 @@ public class Theme {
 
         fallbackKeys.put(key_returnToCallMutedBackground, key_windowBackgroundWhite);
         fallbackKeys.put(key_dialogSwipeRemove, key_avatar_backgroundRed);
+
+        fallbackKeys.put(key_chat_inReactionButtonBackground, key_chat_inLoader);
+        fallbackKeys.put(key_chat_outReactionButtonBackground, key_chat_outLoader);
+        fallbackKeys.put(key_chat_inReactionButtonText, key_chat_inPreviewInstantText);
+        fallbackKeys.put(key_chat_outReactionButtonText, key_chat_outPreviewInstantText);
+        fallbackKeys.put(key_chat_inReactionButtonTextSelected, key_windowBackgroundWhite);
+        fallbackKeys.put(key_chat_outReactionButtonTextSelected, key_windowBackgroundWhite);
 
         themeAccentExclusionKeys.addAll(Arrays.asList(keys_avatar_background));
         themeAccentExclusionKeys.addAll(Arrays.asList(keys_avatar_nameInMessage));
@@ -5507,7 +5532,9 @@ public class Theme {
             int dayOfMonth = calendar.get(Calendar.DAY_OF_MONTH);
             int minutes = calendar.get(Calendar.MINUTE);
             int hour = calendar.get(Calendar.HOUR_OF_DAY);
-            if (monthOfYear == 0 && dayOfMonth == 1 && minutes <= 10 && hour == 0) {
+            if (monthOfYear == 0 && dayOfMonth == 1 && hour <= 23) {
+                canStartHolidayAnimation = true;
+            } else if (calendar.get(Calendar.YEAR) == 2022 && monthOfYear == 1 && dayOfMonth == 1) {
                 canStartHolidayAnimation = true;
             } else {
                 canStartHolidayAnimation = false;
@@ -5521,6 +5548,14 @@ public class Theme {
             }
         }
         return dialogs_holidayDrawable;
+    }
+
+    public static boolean canStartLunarHolidayAnimation() {
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTimeInMillis(System.currentTimeMillis());
+        int monthOfYear = calendar.get(Calendar.MONTH);
+        int dayOfMonth = calendar.get(Calendar.DAY_OF_MONTH);
+        return calendar.get(Calendar.YEAR) == 2022 && ((monthOfYear == 0 && dayOfMonth == 31) || (monthOfYear == 1 && dayOfMonth <= 6));
     }
 
     public static int getCurrentHolidayDrawableXOffset() {
@@ -7531,7 +7566,9 @@ public class Theme {
         try {
             String[] wallpaperLink = new String[1];
             HashMap<String, Integer> colors = getThemeFileValues(new File(pathToFile), null, wallpaperLink);
-            checkIsDark(colors, accent.parentTheme);
+            if (accent != null) {
+                checkIsDark(colors, accent.parentTheme);
+            }
             Integer wallpaperFileOffset = colors.get("wallpaperFileOffset");
             Bitmap bitmap = Bitmaps.createBitmap(560, 678, Bitmap.Config.ARGB_8888);
             Canvas canvas = new Canvas(bitmap);
@@ -9128,7 +9165,7 @@ public class Theme {
                 return colorInteger;
             }
         }
-        return  getColor(key);
+        return getColor(key);
     }
     public static int getColor(String key) {
         return getColor(key, null, false);

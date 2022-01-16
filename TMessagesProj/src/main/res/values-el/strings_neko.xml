@@ -41,7 +41,6 @@
     <string name="UnlimitedFavoredStickers">Απεριόριστα αγαπημένα αυτοκόλλητα</string>
     <string name="UnlimitedFavoredStickersAbout">Προσθέστε απεριόριστα αυτοκόλλητα στα αγαπημένα. Τα αυτοκόλλητα μπορεί να μην συγχρονίζονται σε άλλες συσκευές.</string>
     <string name="MessageDetails">Λεπτομέρειες</string>
-    <string name="Translate">Μετάφραση</string>
     <string name="DeleteAccount">Διαγραφή λογαριασμού Telegram</string>
     <string name="TranslateFailed">Translate server error</string>
     <string name="TranslationProvider">Translation provider</string>
@@ -54,8 +53,6 @@
     <string name="UnlimitedPinnedDialogsAbout">Καρφίτσωμα απεριόριστων διαλόγων απενεργοποιώντας τον συγχρονισμό.</string>
     <string name="OpenArchiveOnPull">Άνοιγμα αρχείου κατά το τράβηγμα</string>
     <string name="HideKeyboardOnChatScroll">Απόκρυψη πληκτρολογίου στην κύλιση συνομιλίας</string>
-    <string name="UserRestrictionsSendStickers2">Αποστολή Αυτοκόλλητων</string>
-    <string name="UserRestrictionsSendGifs">Αποστολή GIFs</string>
     <string name="RearVideoMessages">Rear camera in Video Messages</string>
     <string name="HideAllTab">Hide \"All Chats\" tab</string>
     <string name="HideAllTabAbout">Press \"Back\" on home page to open it.</string>
@@ -66,4 +63,5 @@
     <string name="TabTitleTypeMix">Emoticons with titles</string>
     <string name="ConfirmAVMessage">Confirm sending video/voice message</string>
     <string name="AskBeforeCalling">Ask before calling</string>
+    <!-- Accessibility -->
 </resources>

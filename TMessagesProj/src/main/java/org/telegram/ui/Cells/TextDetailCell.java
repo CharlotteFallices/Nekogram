@@ -10,23 +10,29 @@ package org.telegram.ui.Cells;
 
 import android.content.Context;
 import android.graphics.Canvas;
+import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.text.TextUtils;
 import android.util.TypedValue;
 import android.view.Gravity;
+import android.view.View;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.TextView;
 
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.Emoji;
 import org.telegram.messenger.LocaleController;
+import org.telegram.messenger.R;
 import org.telegram.ui.ActionBar.Theme;
 import org.telegram.ui.Components.LayoutHelper;
 
 public class TextDetailCell extends FrameLayout {
 
-    private TextView textView;
-    private TextView valueTextView;
+    private final TextView textView;
+    private final TextView valueTextView;
+    private final ImageView imageView;
     private boolean needDivider;
     private boolean contentDescriptionValueFirst;
 
@@ -53,6 +59,11 @@ public class TextDetailCell extends FrameLayout {
         valueTextView.setGravity(LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT);
         valueTextView.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
         addView(valueTextView, LayoutHelper.createFrame(LayoutHelper.WRAP_CONTENT, LayoutHelper.WRAP_CONTENT, LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT, 23, 33, 23, 0));
+
+        imageView = new ImageView(context);
+        imageView.setScaleType(ImageView.ScaleType.CENTER);
+        imageView.setVisibility(GONE);
+        addView(imageView, LayoutHelper.createFrameRelatively(48, 48, Gravity.END | Gravity.CENTER_VERTICAL, 0, 0, 12, 0));
     }
 
     @Override
@@ -65,6 +76,29 @@ public class TextDetailCell extends FrameLayout {
         valueTextView.setText(value);
         needDivider = divider;
         setWillNotDraw(!needDivider);
+    }
+
+    public void setImage(Drawable drawable) {
+        imageView.setImageDrawable(drawable);
+        if (drawable == null) {
+            imageView.setVisibility(GONE);
+            imageView.setBackground(null);
+        } else {
+            imageView.setContentDescription(LocaleController.getString("QrCode", R.string.QrCode));
+            imageView.setVisibility(VISIBLE);
+            imageView.setBackground(Theme.createSimpleSelectorCircleDrawable(AndroidUtilities.dp(48), Color.TRANSPARENT, Theme.getColor(Theme.key_listSelector)));
+        }
+        int margin = AndroidUtilities.dp(23) + (drawable == null ? 0 : AndroidUtilities.dp(48));
+        if (LocaleController.isRTL) {
+            ((MarginLayoutParams) textView.getLayoutParams()).leftMargin = margin;
+        } else {
+            ((MarginLayoutParams) textView.getLayoutParams()).rightMargin = margin;
+        }
+        textView.requestLayout();
+    }
+
+    public void setImageClickListener(View.OnClickListener clickListener) {
+        imageView.setOnClickListener(clickListener);
     }
 
     public void setTextWithEmojiAndValue(String text, CharSequence value, boolean divider) {

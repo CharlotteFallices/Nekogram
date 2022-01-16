@@ -37,6 +37,7 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
 import org.telegram.messenger.Emoji;
+import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessageObject;
 import org.telegram.messenger.R;
 import org.telegram.messenger.SharedConfig;
@@ -1220,7 +1221,7 @@ public abstract class TextSelectionHelper<Cell extends TextSelectionHelper.Selec
             public boolean onCreateActionMode(ActionMode mode, Menu menu) {
                 menu.add(Menu.NONE, android.R.id.copy, 0, android.R.string.copy);
                 menu.add(Menu.NONE, android.R.id.selectAll, 1, android.R.string.selectAll);
-                menu.add(Menu.NONE, R.id.menu_translate, 2, R.string.Translate);
+                menu.add(Menu.NONE, R.id.menu_translate, 2, LocaleController.getString("TranslateMessage", R.string.TranslateMessage));
                 return true;
             }
 
@@ -1242,37 +1243,39 @@ public abstract class TextSelectionHelper<Cell extends TextSelectionHelper.Selec
                 if (!isSelectionMode()) {
                     return true;
                 }
-                switch (item.getItemId()) {
-                    case android.R.id.copy:
-                        copyText();
+                int itemId = item.getItemId();
+                if (itemId == android.R.id.copy) {
+                    copyText();
+                    return true;
+                } else if (itemId == android.R.id.selectAll) {
+                    CharSequence text = getText(selectedView, false);
+                    if (text == null) {
                         return true;
-                    case android.R.id.selectAll:
-                        CharSequence text = getText(selectedView, false);
-                        if (text == null) {
-                            return true;
-                        }
-                        selectionStart = 0;
-                        selectionEnd = text.length();
-                        hideActions();
-                        invalidate();
-                        showActions();
+                    }
+                    selectionStart = 0;
+                    selectionEnd = text.length();
+                    hideActions();
+                    invalidate();
+                    showActions();
+                    return true;
+                } else if (itemId == R.id.menu_translate) {
+                    if (!isSelectionMode()) {
                         return true;
-                    case R.id.menu_translate:
-                        if (!isSelectionMode()) {
-                            return true;
-                        }
-                        CharSequence str = getTextForCopy();
-                        if (str == null) {
-                            return true;
-                        }
-                        Translator.showTranslateDialog(textSelectionOverlay.getContext(), str.toString(), () -> TextSelectionHelper.this.callback.onTextCopied(), getResourcesProvider());
-                        hideActions();
-                        clear(true);
-                        if (TextSelectionHelper.this.callback != null) {
-                            TextSelectionHelper.this.callback.onTextTranslated();
-                        }
-                    default:
-                        clear();
+                    }
+                    CharSequence str = getTextForCopy();
+                    if (str == null) {
+                        return true;
+                    }
+                    Translator.showTranslateDialog(textSelectionOverlay.getContext(), str.toString(), false);
+                    hideActions();
+                    clear(true);
+                    if (TextSelectionHelper.this.callback != null) {
+                        TextSelectionHelper.this.callback.onTextTranslated();
+                    }
+
+                    clear();
+                } else {
+                    clear();
                 }
                 return true;
             }

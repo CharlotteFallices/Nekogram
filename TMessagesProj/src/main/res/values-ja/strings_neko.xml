@@ -45,7 +45,6 @@
     <string name="UnlimitedFavoredStickers">無制限のお気に入りのステッカー</string>
     <string name="UnlimitedFavoredStickersAbout">お気に入りに無制限のステッカーを追加します。ステッカーは他の端末と同期されない場合があります。</string>
     <string name="MessageDetails">詳細</string>
-    <string name="Translate">翻訳</string>
     <string name="DeleteAccount">Telegramアカウントの削除</string>
     <string name="TranslateFailed">翻訳サーバエラー</string>
     <string name="TranslationProvider">翻訳プロバイダ</string>
@@ -58,8 +57,6 @@
     <string name="UnlimitedPinnedDialogsAbout">チャットを無制限に固定することができます。固定は同期されなくなります。</string>
     <string name="OpenArchiveOnPull">保管したチャットをプルダウンで開く</string>
     <string name="HideKeyboardOnChatScroll">チャットスクロールでキーボードを非表示にする</string>
-    <string name="UserRestrictionsSendStickers2">ステッカーの送信</string>
-    <string name="UserRestrictionsSendGifs">GIFの送信</string>
     <string name="RearVideoMessages">ビデオメッセージでリアカメラを使用する</string>
     <string name="HideAllTab">「すべてのチャット」タブを非表示にする</string>
     <string name="HideAllTabAbout">ホームページで「戻る」を押して開く</string>
@@ -71,4 +68,5 @@
     <string name="ConfirmAVMessage">ビデオ/ボイスメッセージを送信するときに確認する</string>
     <string name="AskBeforeCalling">通話する前に確認する</string>
     <string name="IdTypeHidden">隠す</string>
+    <!-- Accessibility -->
 </resources>

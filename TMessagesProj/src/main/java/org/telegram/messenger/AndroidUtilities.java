@@ -28,6 +28,7 @@ import android.content.res.AssetFileDescriptor;
 import android.content.res.Configuration;
 import android.database.Cursor;
 import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Paint;
@@ -38,6 +39,7 @@ import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -94,6 +96,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager.widget.ViewPager;
 
 import com.android.internal.telephony.ITelephony;
+import com.google.android.exoplayer2.util.Log;
 import com.google.android.gms.auth.api.phone.SmsRetriever;
 import com.google.android.gms.auth.api.phone.SmsRetrieverClient;
 import com.google.android.gms.tasks.Task;
@@ -1320,14 +1323,13 @@ public class AndroidUtilities {
         synchronized (typefaceCache) {
             if (!typefaceCache.containsKey(assetPath)) {
                 try {
-                    Typeface t;
+                    Typeface t = null;
                     switch (assetPath) {
-                        default:
                         case "fonts/rmedium.ttf":
                             t = Typeface.create("sans-serif-medium", Typeface.NORMAL);
                             break;
                         case "fonts/ritalic.ttf":
-                            t = Typeface.create((Typeface) null, Typeface.ITALIC);
+                            t = Typeface.create("sans-serif", Typeface.ITALIC);
                             break;
                         case "fonts/rmediumitalic.ttf":
                             t = Typeface.create("sans-serif-medium", Typeface.ITALIC);
@@ -1338,6 +1340,20 @@ public class AndroidUtilities {
                         case "fonts/mw_bold.ttf":
                             t = Typeface.create("serif", Typeface.BOLD);
                             break;
+                    }
+                    if (t == null) {
+                        if (Build.VERSION.SDK_INT >= 26) {
+                            Typeface.Builder builder = new Typeface.Builder(ApplicationLoader.applicationContext.getAssets(), assetPath);
+                            if (assetPath.contains("medium")) {
+                                builder.setWeight(700);
+                            }
+                            if (assetPath.contains("italic")) {
+                                builder.setItalic(true);
+                            }
+                            t = builder.build();
+                        } else {
+                            t = Typeface.createFromAsset(ApplicationLoader.applicationContext.getAssets(), assetPath);
+                        }
                     }
                     typefaceCache.put(assetPath, t);
                 } catch (Exception e) {
@@ -1977,6 +1993,29 @@ public class AndroidUtilities {
                 setEnabled(viewGroup.getChildAt(i), enabled);
             }
         }
+    }
+
+    public static int charSequenceIndexOf(CharSequence cs, CharSequence needle, int fromIndex) {
+        for (int i = fromIndex; i < cs.length() - needle.length(); i++) {
+            boolean eq = true;
+            for (int j = 0; j < needle.length(); j++) {
+                if (needle.charAt(j) != cs.charAt(i + j)) {
+                    eq = false;
+                    break;
+                }
+            }
+            if (eq)
+                return i;
+        }
+        return -1;
+    }
+
+    public static int charSequenceIndexOf(CharSequence cs, CharSequence needle) {
+        return charSequenceIndexOf(cs, needle, 0);
+    }
+
+    public static boolean charSequenceContains(CharSequence cs, CharSequence needle) {
+        return charSequenceIndexOf(cs, needle) != -1;
     }
 
     public static CharSequence getTrimmedString(CharSequence src) {
@@ -2806,20 +2845,20 @@ public class AndroidUtilities {
                             }
                         }
                     }
-                    if (Build.VERSION.SDK_INT >= 24) {
+                    //if (Build.VERSION.SDK_INT >= 24) {
                         intent.setDataAndType(FileProvider.getUriForFile(activity, BuildConfig.APPLICATION_ID + ".provider", f), realMimeType != null ? realMimeType : "text/plain");
-                    } else {
-                        intent.setDataAndType(Uri.fromFile(f), realMimeType != null ? realMimeType : "text/plain");
-                    }
+                    //} else {
+                    //    intent.setDataAndType(Uri.fromFile(f), realMimeType != null ? realMimeType : "text/plain");
+                    //}
                     if (realMimeType != null) {
                         try {
                             activity.startActivityForResult(intent, 500);
                         } catch (Exception e) {
-                            if (Build.VERSION.SDK_INT >= 24) {
+                            //if (Build.VERSION.SDK_INT >= 24) {
                                 intent.setDataAndType(FileProvider.getUriForFile(activity, BuildConfig.APPLICATION_ID + ".provider", f), "text/plain");
-                            } else {
-                                intent.setDataAndType(Uri.fromFile(f), "text/plain");
-                            }
+                            //} else {
+                            //    intent.setDataAndType(Uri.fromFile(f), "text/plain");
+                            //}
                             activity.startActivityForResult(intent, 500);
                         }
                     } else {
@@ -2875,20 +2914,20 @@ public class AndroidUtilities {
                 builder.show();
                 return true;
             }*/
-            if (Build.VERSION.SDK_INT >= 24) {
+            //if (Build.VERSION.SDK_INT >= 24) {
                 intent.setDataAndType(FileProvider.getUriForFile(activity, BuildConfig.APPLICATION_ID + ".provider", f), realMimeType != null ? realMimeType : "text/plain");
-            } else {
-                intent.setDataAndType(Uri.fromFile(f), realMimeType != null ? realMimeType : "text/plain");
-            }
+            //} else {
+            //    intent.setDataAndType(Uri.fromFile(f), realMimeType != null ? realMimeType : "text/plain");
+            //}
             if (realMimeType != null) {
                 try {
                     activity.startActivityForResult(intent, 500);
                 } catch (Exception e) {
-                    if (Build.VERSION.SDK_INT >= 24) {
+                    //if (Build.VERSION.SDK_INT >= 24) {
                         intent.setDataAndType(FileProvider.getUriForFile(activity, BuildConfig.APPLICATION_ID + ".provider", f), "text/plain");
-                    } else {
-                        intent.setDataAndType(Uri.fromFile(f), "text/plain");
-                    }
+                    //} else {
+                    //    intent.setDataAndType(Uri.fromFile(f), "text/plain");
+                    //}
                     activity.startActivityForResult(intent, 500);
                 }
             } else {
@@ -2917,6 +2956,57 @@ public class AndroidUtilities {
         return openForView(f, fileName, document.mime_type, activity, null);
     }
 
+    public static SpannableStringBuilder formatSpannableSimple(String format, CharSequence... cs) {
+        return formatSpannable(format, i -> "%s", cs);
+    }
+
+    public static SpannableStringBuilder formatSpannable(String format, CharSequence... cs) {
+        if (format.contains("%s"))
+            return formatSpannableSimple(format, cs);
+        return formatSpannable(format, i -> "%" + (i + 1) + "$s", cs);
+    }
+
+    public static SpannableStringBuilder formatSpannable(String format, GenericProvider<Integer, String> keysProvider, CharSequence... cs) {
+        SpannableStringBuilder stringBuilder = new SpannableStringBuilder(format);
+        for (int i = 0; i < cs.length; i++) {
+            String key = keysProvider.provide(i);
+            int j = format.indexOf(key);
+            if (j != -1) {
+                stringBuilder.replace(j, j + key.length(), cs[i]);
+                format = format.substring(0, j) + cs[i].toString() + format.substring(j + key.length());
+            }
+        }
+        return stringBuilder;
+    }
+
+    public static CharSequence replaceTwoNewLinesToOne(CharSequence original) {
+        char[] buf = new char[2];
+        if (original instanceof StringBuilder) {
+            StringBuilder stringBuilder = (StringBuilder) original;
+            for (int a = 0, N = original.length(); a < N - 2; a++) {
+                stringBuilder.getChars(a, a + 2, buf, 0);
+                if (buf[0] == '\n' && buf[1] == '\n') {
+                    stringBuilder = stringBuilder.replace(a, a + 2, "\n");
+                    a--;
+                    N--;
+                }
+            }
+            return original;
+        } else if (original instanceof SpannableStringBuilder) {
+            SpannableStringBuilder stringBuilder = (SpannableStringBuilder) original;
+            for (int a = 0, N = original.length(); a < N - 2; a++) {
+                stringBuilder.getChars(a, a + 2, buf, 0);
+                if (buf[0] == '\n' && buf[1] == '\n') {
+                    stringBuilder = stringBuilder.replace(a, a + 2, "\n");
+                    a--;
+                    N--;
+                }
+            }
+            return original;
+        }
+        return original.toString().replace("\n\n", "\n");
+    }
+
     public static CharSequence replaceNewLines(CharSequence original) {
         if (original instanceof StringBuilder) {
             StringBuilder stringBuilder = (StringBuilder) original;
@@ -2925,6 +3015,7 @@ public class AndroidUtilities {
                     stringBuilder.setCharAt(a, ' ');
                 }
             }
+            return original;
         } else if (original instanceof SpannableStringBuilder) {
             SpannableStringBuilder stringBuilder = (SpannableStringBuilder) original;
             for (int a = 0, N = original.length(); a < N; a++) {
@@ -2932,6 +3023,7 @@ public class AndroidUtilities {
                     stringBuilder.replace(a, a + 1, " ");
                 }
             }
+            return original;
         }
         return original.toString().replace('\n', ' ');
     }
@@ -2960,11 +3052,11 @@ public class AndroidUtilities {
                     }
                 }
             }
-            if (Build.VERSION.SDK_INT >= 24) {
+            //if (Build.VERSION.SDK_INT >= 24) {
                 intent.setDataAndType(FileProvider.getUriForFile(activity, BuildConfig.APPLICATION_ID + ".provider", f), realMimeType != null ? realMimeType : "text/plain");
-            } else {
-                intent.setDataAndType(Uri.fromFile(f), realMimeType != null ? realMimeType : "text/plain");
-            }
+            //} else {
+            //    intent.setDataAndType(Uri.fromFile(f), realMimeType != null ? realMimeType : "text/plain");
+            //}
             if (realMimeType != null) {
                 try {
                     activity.startActivityForResult(intent, 500);
@@ -3667,6 +3759,9 @@ public class AndroidUtilities {
     }
 
     public static boolean checkHostForPunycode(String url) {
+        if (url == null) {
+            return false;
+        }
         boolean hasLatin = false;
         boolean hasNonLatin = false;
         try {
@@ -3799,5 +3894,76 @@ public class AndroidUtilities {
         } catch (Exception e) {
             return preferences.getInt(key, (int) defaultValue);
         }
+    }
+
+    public static Bitmap getScaledBitmap(float w, float h, String path, String streamPath, int streamOffset) {
+        FileInputStream stream = null;
+        try {
+            BitmapFactory.Options options = new BitmapFactory.Options();
+            options.inJustDecodeBounds = true;
+
+            if (path != null) {
+                BitmapFactory.decodeFile(path, options);
+            } else {
+                stream = new FileInputStream(streamPath);
+                stream.getChannel().position(streamOffset);
+                BitmapFactory.decodeStream(stream, null, options);
+            }
+            if (options.outWidth > 0 && options.outHeight > 0) {
+                if (w > h && options.outWidth < options.outHeight) {
+                    float temp = w;
+                    w = h;
+                    h = temp;
+                }
+                float scale = Math.min(options.outWidth / w, options.outHeight / h);
+                options.inSampleSize = 1;
+                if (scale > 1.0f) {
+                    do {
+                        options.inSampleSize *= 2;
+                    } while (options.inSampleSize < scale);
+                }
+                options.inJustDecodeBounds = false;
+                Bitmap wallpaper;
+                if (path != null) {
+                    wallpaper = BitmapFactory.decodeFile(path, options);
+                } else {
+                    stream.getChannel().position(streamOffset);
+                    wallpaper = BitmapFactory.decodeStream(stream, null, options);
+                }
+                return wallpaper;
+            }
+        } catch (Throwable e) {
+            FileLog.e(e);
+        } finally {
+            try {
+                if (stream != null) {
+                    stream.close();
+                }
+            } catch (Exception e2) {
+                FileLog.e(e2);
+            }
+        }
+        return null;
+    }
+
+    public static Uri getBitmapShareUri(Bitmap bitmap, String fileName, Bitmap.CompressFormat format) {
+        File cachePath = AndroidUtilities.getCacheDir();
+        if (!cachePath.isDirectory()) {
+            try {
+                cachePath.mkdirs();
+            } catch (Exception e) {
+                FileLog.e(e);
+                return null;
+            }
+        }
+        File file = new File(cachePath, fileName);
+        try (FileOutputStream out = new FileOutputStream(file)) {
+            bitmap.compress(format, 100, out);
+            out.close();
+            return FileProvider.getUriForFile(ApplicationLoader.applicationContext, BuildConfig.APPLICATION_ID + ".provider", file);
+        } catch (IOException e) {
+            FileLog.e(e);
+        }
+        return null;
     }
 }

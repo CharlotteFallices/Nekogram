@@ -1,22 +1,22 @@
 package tw.nekomimi.nekogram.translator;
 
 import android.annotation.SuppressLint;
+import android.content.ActivityNotFoundException;
 import android.content.Context;
+import android.content.Intent;
 import android.text.TextUtils;
-import android.util.TypedValue;
-import android.view.Gravity;
 import android.view.View;
-import android.widget.TextView;
 
 import androidx.core.text.HtmlCompat;
 import androidx.core.util.Pair;
 
-import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.LocaleController;
 import org.telegram.messenger.MessagesStorage;
 import org.telegram.messenger.R;
 import org.telegram.ui.ActionBar.AlertDialog;
+import org.telegram.ui.ActionBar.BaseFragment;
 import org.telegram.ui.ActionBar.Theme;
+import org.telegram.ui.Components.TranslateAlert;
 
 import java.util.ArrayList;
 import java.util.Locale;
@@ -32,67 +32,22 @@ public class Translator {
     public static final int PROVIDER_DEEPL = 5;
     public static final int PROVIDER_MICROSOFT = 7;
     public static final int PROVIDER_TENCENT = 8;
-    public static final int PROVIDER_NIU = 9;
 
-    @SuppressLint("StaticFieldLeak")
-    private static AlertDialog progressDialog;
-
-    public static void showTranslateDialog(Context context, String query, Runnable callback) {
-        showTranslateDialog(context, query, callback, null);
+    public static void showTranslateDialog(Context context, String query, boolean noforwards) {
+        showTranslateDialog(context, query, noforwards, null, null);
     }
 
-    public static void showTranslateDialog(Context context, String query, Runnable callback, Theme.ResourcesProvider resourcesProvider) {
-        try {
-            progressDialog.dismiss();
-        } catch (Exception ignore) {
-
+    public static void showTranslateDialog(Context context, String query, boolean noforwards, BaseFragment fragment, TranslateAlert.OnLinkPress onLinkPress) {
+        if (NekoConfig.transType == NekoConfig.TRANS_TYPE_EXTERNAL) {
+            Translator.startExternalTranslator(context, query);
+        } else {
+            TranslateAlert.showAlert(context, fragment, null, NekoConfig.translationTarget, query, noforwards, onLinkPress);
         }
-        progressDialog = new AlertDialog(context, 3, resourcesProvider);
-        progressDialog.showDelayed(400);
-        translate(query, new TranslateCallBack() {
-            @Override
-            public void onSuccess(Object translation) {
-                try {
-                    progressDialog.dismiss();
-                } catch (Exception ignore) {
-
-                }
-
-                TextView messageTextView = new TextView(context);
-                messageTextView.setTextColor(Theme.getColor(Theme.key_dialogTextBlack, resourcesProvider));
-                messageTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 16);
-                messageTextView.setGravity((LocaleController.isRTL ? Gravity.RIGHT : Gravity.LEFT) | Gravity.TOP);
-                messageTextView.setTextIsSelectable(true);
-                messageTextView.setText((String) translation);
-                messageTextView.setPadding(AndroidUtilities.dp(24), AndroidUtilities.dp(4), AndroidUtilities.dp(24), AndroidUtilities.dp(4));
-
-                AlertDialog.Builder builder = new AlertDialog.Builder(context, resourcesProvider);
-                builder.setView(messageTextView);
-                builder.setPositiveButton(LocaleController.getString("OK", R.string.OK), null);
-                builder.setNeutralButton(LocaleController.getString("Copy", R.string.Copy), (dialog, which) -> {
-                    AndroidUtilities.addToClipboard((String) translation);
-                    if (callback != null) {
-                        callback.run();
-                    }
-                });
-                builder.show();
-            }
-
-            @Override
-            public void onError(Exception e) {
-                handleTranslationError(context, e, () -> showTranslateDialog(context, query, callback, resourcesProvider), resourcesProvider);
-            }
-        });
     }
 
     public static void handleTranslationError(Context context, final Exception e, final Runnable onRetry, Theme.ResourcesProvider resourcesProvider) {
         if (context == null) {
             return;
-        }
-        try {
-            progressDialog.dismiss();
-        } catch (Exception ignore) {
-
         }
         AlertDialog.Builder builder = new AlertDialog.Builder(context, resourcesProvider);
         if (e instanceof UnsupportedTargetLanguageException) {
@@ -129,8 +84,6 @@ public class Translator {
         types.add(Translator.PROVIDER_MICROSOFT);
         names.add(LocaleController.getString("ProviderTencentTranslator", R.string.ProviderTencentTranslator));
         types.add(Translator.PROVIDER_TENCENT);
-        names.add(LocaleController.getString("ProviderNiuTrans", R.string.ProviderNiuTrans));
-        types.add(Translator.PROVIDER_NIU);
         return new Pair<>(names, types);
     }
 
@@ -155,8 +108,27 @@ public class Translator {
 
         PopupHelper.show(names, LocaleController.getString("TranslationTarget", R.string.TranslationTarget), targetLanguages.indexOf(NekoConfig.translationTarget), context, view, i -> {
             NekoConfig.setTranslationTarget(targetLanguages.get(i));
-            callback.run();
+            if (callback != null) callback.run();
         }, resourcesProvider);
+    }
+
+    public static void showTranslatorTypeSelector(Context context, View view, Runnable callback) {
+        showTranslatorTypeSelector(context, view, callback, null);
+    }
+
+    public static void showTranslatorTypeSelector(Context context, View view, Runnable callback, Theme.ResourcesProvider resourcesProvider) {
+        ArrayList<String> arrayList = new ArrayList<>();
+        ArrayList<Integer> types = new ArrayList<>();
+        arrayList.add(LocaleController.getString("TranslatorTypeNeko", R.string.TranslatorTypeNeko));
+        types.add(NekoConfig.TRANS_TYPE_NEKO);
+        arrayList.add(LocaleController.getString("TranslatorTypeTG", R.string.TranslatorTypeTG));
+        types.add(NekoConfig.TRANS_TYPE_TG);
+        arrayList.add(LocaleController.getString("TranslatorTypeExternal", R.string.TranslatorTypeExternal));
+        types.add(NekoConfig.TRANS_TYPE_EXTERNAL);
+        PopupHelper.show(arrayList, LocaleController.getString("TranslatorType", R.string.TranslatorType), types.indexOf(NekoConfig.transType), context, view, i -> {
+            NekoConfig.setTransType(types.get(i));
+            if (callback != null) callback.run();
+        });
     }
 
     public static void showTranslationProviderSelector(Context context, View view, MessagesStorage.BooleanCallback callback) {
@@ -183,7 +155,7 @@ public class Translator {
                 if ("app".equals(NekoConfig.translationTarget)) {
                     builder.setPositiveButton(LocaleController.getString("UseGoogleTranslate", R.string.UseGoogleTranslate), (dialog, which) -> {
                         NekoConfig.setTranslationProvider(Translator.PROVIDER_GOOGLE);
-                        if (callback != null) callback.run(false);
+                        if (callback != null) callback.run(true);
                     });
                     builder.setNegativeButton(LocaleController.getString("Cancel", R.string.Cancel), null);
                 } else if (translator.supportLanguage(translator.getCurrentAppLanguage())) {
@@ -217,8 +189,6 @@ public class Translator {
                 return MicrosoftTranslator.getInstance();
             case PROVIDER_TENCENT:
                 return TencentTranslator.getInstance();
-            case PROVIDER_NIU:
-                return NiuTranslator.getInstance();
             case PROVIDER_GOOGLE:
             default:
                 return GoogleAppTranslator.getInstance();
@@ -226,9 +196,13 @@ public class Translator {
     }
 
     public static void translate(Object query, TranslateCallBack translateCallBack) {
+        translate(query, null, translateCallBack);
+    }
+
+    public static void translate(Object query, String tl, TranslateCallBack translateCallBack) {
         BaseTranslator translator = getCurrentTranslator();
 
-        String language = translator.getCurrentTargetLanguage();
+        String language = tl != null ? tl : translator.getCurrentTargetLanguage();
 
         if (!translator.supportLanguage(language)) {
             translateCallBack.onError(new UnsupportedTargetLanguageException());
@@ -237,8 +211,21 @@ public class Translator {
         }
     }
 
+    public static void startExternalTranslator(Context context, String text) {
+        @SuppressLint("InlinedApi") var intent = new Intent(Intent.ACTION_TRANSLATE);
+        intent.putExtra(Intent.EXTRA_TEXT, text);
+        try {
+            context.startActivity(intent);
+        } catch (ActivityNotFoundException e) {
+            new AlertDialog.Builder(context)
+                    .setTitle(LocaleController.getString("AppName", R.string.AppName))
+                    .setMessage(LocaleController.getString("NoTranslatorAppInstalled", R.string.NoTranslatorAppInstalled))
+                    .show();
+        }
+    }
+
     public interface TranslateCallBack {
-        void onSuccess(Object translation);
+        void onSuccess(Object translation, String sourceLanguage);
 
         void onError(Exception e);
     }

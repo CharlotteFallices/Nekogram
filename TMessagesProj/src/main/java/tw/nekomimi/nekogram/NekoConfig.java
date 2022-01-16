@@ -6,10 +6,13 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Typeface;
 import android.os.Build;
+import android.os.Environment;
+import android.text.TextUtils;
 
 import org.tcp2ws.tcp2wsServer;
 import org.telegram.messenger.AndroidUtilities;
 import org.telegram.messenger.ApplicationLoader;
+import org.telegram.messenger.BuildConfig;
 import org.telegram.messenger.BuildVars;
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.NotificationsService;
@@ -19,12 +22,14 @@ import org.telegram.tgnet.TLRPC;
 import org.telegram.ui.ActionBar.Theme;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileReader;
 import java.net.ServerSocket;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import tw.nekomimi.nekogram.helpers.remote.ConfigHelper;
 import tw.nekomimi.nekogram.translator.DeepLTranslator;
 import tw.nekomimi.nekogram.translator.Translator;
 
@@ -40,9 +45,11 @@ public class NekoConfig {
     public static final int ID_TYPE_API = 1;
     public static final int ID_TYPE_BOTAPI = 2;
 
-    private static final String EMOJI_FONT_AOSP = "NotoColorEmoji.ttf";
+    public static final int TRANS_TYPE_NEKO = 0;
+    public static final int TRANS_TYPE_TG = 1;
+    public static final int TRANS_TYPE_EXTERNAL = 2;
 
-    private static final int[] OFFICIAL_CHANNELS = {1302242053, 1406090861, 1221673407, 1339737452, 1349472891};
+    private static final String EMOJI_FONT_AOSP = "NotoColorEmoji.ttf";
 
     private static final Object sync = new Object();
     public static boolean useIPv6 = false;
@@ -64,9 +71,10 @@ public class NekoConfig {
     public static int translationProvider = Translator.PROVIDER_GOOGLE;
     public static String translationTarget = "app";
     public static int deepLFormality = DeepLTranslator.FORMALITY_DEFAULT;
-    public static int tabsTitleType = TITLE_TYPE_TEXT;
+    public static int tabsTitleType = TITLE_TYPE_MIX;
     public static int idType = ID_TYPE_API;
     public static int maxRecentStickers = 20;
+    public static int transType = TRANS_TYPE_NEKO;
 
     public static boolean showAddToSavedMessages = true;
     public static boolean showReport = false;
@@ -79,6 +87,7 @@ public class NekoConfig {
     public static boolean showTranslate = true;
     public static boolean showRepeat = true;
     public static boolean showNoQuoteForward = true;
+    public static boolean showCopyPhoto = false;
 
     public static boolean hidePhone = true;
     public static boolean transparentStatusBar = false;
@@ -107,6 +116,8 @@ public class NekoConfig {
     public static boolean silenceNonContacts = false;
     public static boolean swipeToPiP = false;
     public static boolean disableJumpToNextChannel = false;
+    public static boolean useExternalTranslator = false;
+    public static boolean disableVoiceMessageAutoPlay = false;
 
     public static final String WS_ADDRESS = "ws.neko";
     private static int socksPort = -1;
@@ -127,12 +138,27 @@ public class NekoConfig {
     private static Typeface systemEmojiTypeface;
     public static boolean loadSystemEmojiFailed = false;
 
+    public static ArrayList<TLRPC.Update> pendingChangelog;
+
     public static boolean isChineseUser = false;
 
     private static boolean configLoaded;
 
     static {
         loadConfig();
+    }
+
+    public static void buildAppChangelog(TLRPC.TL_help_appUpdate appUpdate) {
+        if (!BuildConfig.VERSION_NAME.equals(appUpdate.version) || appUpdate.text == null) {
+            return;
+        }
+        var update = new TLRPC.TL_updateServiceNotification();
+        update.flags = 2;
+        update.message = appUpdate.text;
+        update.entities = appUpdate.entities;
+        ArrayList<TLRPC.Update> updates = new ArrayList<>();
+        updates.add(update);
+        NekoConfig.pendingChangelog = updates;
     }
 
     public static int getSocksPort() {
@@ -213,7 +239,7 @@ public class NekoConfig {
             showTabsOnForward = preferences.getBoolean("showTabsOnForward", false);
             rearVideoMessages = preferences.getBoolean("rearVideoMessages", false);
             hideAllTab = preferences.getBoolean("hideAllTab", false);
-            tabsTitleType = preferences.getInt("tabsTitleType", TITLE_TYPE_TEXT);
+            tabsTitleType = preferences.getInt("tabsTitleType2", TITLE_TYPE_MIX);
             confirmAVMessage = preferences.getBoolean("confirmAVMessage", false);
             askBeforeCall = preferences.getBoolean("askBeforeCall", true);
             shouldNOTTrustMe = preferences.getBoolean("shouldNOTTrustMe", false);
@@ -243,12 +269,24 @@ public class NekoConfig {
             disableJumpToNextChannel = preferences.getBoolean("disableJumpToNextChannel", false);
             disableGreetingSticker = preferences.getBoolean("disableGreetingSticker", false);
             blockSponsoredMessage = preferences.getBoolean("blockSponsoredMessage", false);
+            useExternalTranslator = preferences.getBoolean("useExternalTranslator", false);
+            disableVoiceMessageAutoPlay = preferences.getBoolean("disableVoiceMessageAutoPlay", false);
+            transType = preferences.getInt("transType", TRANS_TYPE_NEKO);
+            showCopyPhoto = preferences.getBoolean("showCopyPhoto", false);
             configLoaded = true;
         }
     }
 
     public static boolean isChatCat(TLRPC.Chat chat) {
-        return Arrays.stream(OFFICIAL_CHANNELS).anyMatch(id -> id == chat.id);
+        return ConfigHelper.getVerify().stream().anyMatch(id -> id == chat.id);
+    }
+
+    public static void setTransType(int type) {
+        transType = type;
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.putInt("transType", transType);
+        editor.commit();
     }
 
     public static void setWsUseMTP(boolean use) {
@@ -578,7 +616,7 @@ public class NekoConfig {
         tabsTitleType = type;
         SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
         SharedPreferences.Editor editor = preferences.edit();
-        editor.putInt("tabsTitleType", tabsTitleType);
+        editor.putInt("tabsTitleType2", tabsTitleType);
         editor.commit();
     }
 
@@ -742,11 +780,35 @@ public class NekoConfig {
         editor.commit();
     }
 
+    public static void toggleShowCopyPhoto() {
+        showCopyPhoto = !showCopyPhoto;
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.putBoolean("showCopyPhoto", showCopyPhoto);
+        editor.commit();
+    }
+
     public static void toggleBlockSponsoredMessage() {
         blockSponsoredMessage = !blockSponsoredMessage;
         SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
         SharedPreferences.Editor editor = preferences.edit();
         editor.putBoolean("blockSponsoredMessage", blockSponsoredMessage);
+        editor.commit();
+    }
+
+    public static void toggleUseExternalTranslator() {
+        useExternalTranslator = !useExternalTranslator;
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.putBoolean("useExternalTranslator", useExternalTranslator);
+        editor.commit();
+    }
+
+    public static void toggleDisableVoiceMessageAutoPlay() {
+        disableVoiceMessageAutoPlay = !disableVoiceMessageAutoPlay;
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.putBoolean("disableVoiceMessageAutoPlay", disableVoiceMessageAutoPlay);
         editor.commit();
     }
 
@@ -853,5 +915,30 @@ public class NekoConfig {
         } else {
             return 0xff11acfa;
         }
+    }
+
+    public static File getTelegramPath() {
+        File externalStorageDirectory = Environment.getExternalStorageDirectory();
+        File path = null;
+        if (!TextUtils.isEmpty(SharedConfig.storageCacheDir)) {
+            if (!externalStorageDirectory.getAbsolutePath().startsWith(SharedConfig.storageCacheDir)) {
+                File[] dirs = ApplicationLoader.applicationContext.getExternalFilesDirs(null);
+                for (File dir : dirs) {
+                    if (dir.getAbsolutePath().startsWith(SharedConfig.storageCacheDir)) {
+                        path = dir;
+                        break;
+                    }
+                }
+            }
+        }
+        if (path == null) {
+            path = NekoConfig.saveCacheToExternalFilesDir
+                    ? ApplicationLoader.applicationContext.getExternalFilesDir(null)
+                    : externalStorageDirectory;
+        }
+        File telegramPath = new File(path, "Telegram");
+        //noinspection ResultOfMethodCallIgnored
+        telegramPath.mkdirs();
+        return telegramPath;
     }
 }
