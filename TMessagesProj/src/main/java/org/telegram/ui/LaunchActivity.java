@@ -165,6 +165,7 @@ import java.util.regex.Pattern;
 
 import tw.nekomimi.nekogram.helpers.ApkInstaller;
 import tw.nekomimi.nekogram.helpers.remote.UpdateHelper;
+import tw.nekomimi.nekogram.settings.NekoDonateActivity;
 import tw.nekomimi.nekogram.settings.NekoSettingsActivity;
 
 public class LaunchActivity extends Activity implements ActionBarLayout.ActionBarLayoutDelegate, NotificationCenter.NotificationCenterDelegate, DialogsActivity.DialogsActivityDelegate {
@@ -2002,6 +2003,8 @@ public class LaunchActivity extends Activity implements ActionBarLayout.ActionBa
                                         showBulletin(factory -> factory.createErrorBulletin(LocaleController.getString("Nya", R.string.Nya)));
                                     } else if (url.startsWith("tg:upgrade") || url.startsWith("tg://upgrade") || url.startsWith("tg:update") || url.startsWith("tg://update")) {
                                         checkAppUpdate(true);
+                                    } else if (url.startsWith("tg:donate") || url.startsWith("tg://donate")) {
+                                        open_settings = 101;
                                     } else if ((url.startsWith("tg:search") || url.startsWith("tg://search"))) {
                                         url = url.replace("tg:search", "tg://telegram.org").replace("tg://search", "tg://telegram.org");
                                         data = Uri.parse(url);
@@ -2297,6 +2300,8 @@ public class LaunchActivity extends Activity implements ActionBarLayout.ActionBa
                     fragment = new EditWidgetActivity(open_widget_edit_type, open_widget_edit);
                 } else if (open_settings == 100) {
                     fragment = new NekoSettingsActivity();
+                } else if (open_settings == 101) {
+                    fragment = new NekoDonateActivity();
                 } else {
                     fragment = null;
                 }
@@ -3533,16 +3538,16 @@ public class LaunchActivity extends Activity implements ActionBarLayout.ActionBa
             private int lastGradientWidth;
 
             @Override
-            protected void onDraw(Canvas canvas) {
-                if (updateGradient == null) {
-                    return;
+            public void draw(Canvas canvas) {
+                if (updateGradient != null) {
+                    paint.setColor(0xffffffff);
+                    paint.setShader(updateGradient);
+                    updateGradient.setLocalMatrix(matrix);
+                    canvas.drawRect(0, 0, getMeasuredWidth(), getMeasuredHeight(), paint);
+                    updateLayoutIcon.setBackgroundGradientDrawable(updateGradient);
+                    updateLayoutIcon.draw(canvas);
                 }
-                paint.setColor(0xffffffff);
-                paint.setShader(updateGradient);
-                updateGradient.setLocalMatrix(matrix);
-                canvas.drawRect(0, 0, getMeasuredWidth(), getMeasuredHeight(), paint);
-                updateLayoutIcon.setBackgroundGradientDrawable(updateGradient);
-                updateLayoutIcon.draw(canvas);
+                super.draw(canvas);
             }
 
             @Override
@@ -3559,7 +3564,7 @@ public class LaunchActivity extends Activity implements ActionBarLayout.ActionBa
         updateLayout.setVisibility(View.INVISIBLE);
         updateLayout.setTranslationY(AndroidUtilities.dp(44));
         if (Build.VERSION.SDK_INT >= 21) {
-            updateLayout.setBackground(Theme.getSelectorDrawable(Theme.getColor(Theme.key_listSelector), null));
+            updateLayout.setBackground(Theme.getSelectorDrawable(0x40ffffff, false));
         }
         sideMenuContainer.addView(updateLayout, LayoutHelper.createFrame(LayoutHelper.MATCH_PARENT, 44, Gravity.LEFT | Gravity.BOTTOM));
         updateLayout.setOnClickListener(v -> {
@@ -4131,6 +4136,8 @@ public class LaunchActivity extends Activity implements ActionBarLayout.ActionBa
         } else if (requestCode == 2) {
             if (granted) {
                 NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.locationPermissionGranted);
+            } else {
+                NotificationCenter.getGlobalInstance().postNotificationName(NotificationCenter.locationPermissionDenied);
             }
         }
         if (actionBarLayout.fragmentsStack.size() != 0) {

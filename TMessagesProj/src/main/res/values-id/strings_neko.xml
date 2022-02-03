@@ -9,7 +9,6 @@
     <string name="DeleteAllFromSelfAlert">Perhatian! Ini akan **menghapus semua pesan dari Anda** di obrolan ini untuk **semua** orang.</string>
     <string name="BotLogin">Login Bot</string>
     <string name="InvalidAccessToken">Token akses tidak valid</string>
-    <string name="IgnoreBlocked">Abaikan pengguna yang diblokir dalam grup</string>
     <string name="Connection">Sambungan</string>
     <string name="Chat">Obrolan</string>
     <string name="NameOrder">Urutan nama</string>
@@ -77,7 +76,6 @@
     <string name="Categories">Kategori</string>
     <string name="OfficialChannel">Channel resmi</string>
     <string name="About">Tentang</string>
-    <string name="IgnoreBlockedAbout">Anda tidak akan melihat pesan dari pengguna yang diblokir dalam grup.</string>
     <string name="Donate">Donasi</string>
     <string name="DonateAbout">Dukung pengembangan Nekogram.</string>
     <string name="TranslationAbout">Bantu menerjemahkan Nekogram ke bahasa Anda.</string>
@@ -155,7 +153,6 @@
     <string name="ApplyEmojiFont">Terapkan fon emoji</string>
     <string name="DisableJumpToNextChannel">Matikan loncat ke Channel berikutnya</string>
     <string name="DisableGreetingSticker">Matikan stiker salam</string>
-    <string name="BlockSponsoredMessage">Blokir pesan disponsori</string>
     <string name="DeleteAllFromSelfAdmin">Dengan hak admin</string>
     <string name="OfficialSite">Hai</string>
     <string name="MutualContact">Ahh</string>
@@ -177,6 +174,16 @@
     <string name="TranslatorTypeExternal">Aplikasi Eksternal</string>
     <string name="CopyPhoto">Salin Poto</string>
     <string name="PhotoCopied">Poto disalin Di Clipboard</string>
+    <string name="SaveToDownloadCount_zero">Menyimpan %1$d file untuk diunduh</string>
+    <string name="SaveToDownloadCount_one">Menyimpan berkas %1$d ke Unduhan</string>
+    <string name="SaveToDownloadCount_two">Menyimpan berkas %1$d ke Unduhan</string>
+    <string name="SaveToDownloadCount_few">Menyimpan berkas %1$d ke Unduhan</string>
+    <string name="SaveToDownloadCount_many">Menyimpan berkas %1$d ke Unduhan</string>
+    <string name="SaveToDownloadCount_other">Menyimpan berkas %1$d ke Unduhan</string>
+    <string name="ThemesChannel">Saluran tema</string>
+    <string name="SelectAnIcon">Pilih ikon</string>
+    <string name="AppLinkNotVerifiedMessage">Untuk Android 12 dan lebih baru, Anda perlu menambahkan tautan secara manual ke tautan terverifikasi untuk membuka tautan t.me di Nekogram.</string>
+    <string name="AppLinkNotVerifiedTitle">Tautan aplikasi tidak ditambahkan</string>
     <!-- Accessibility -->
     <string name="AccessibilitySettings">Setelan Aksesibilitas</string>
 </resources>

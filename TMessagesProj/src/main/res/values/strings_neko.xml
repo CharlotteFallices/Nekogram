@@ -16,7 +16,7 @@
     <string name="DeleteAllFromSelfAlert">Warning! This will **delete all messages from you** in this chat for **all** participants.</string>
     <string name="BotLogin">Bot Login</string>
     <string name="InvalidAccessToken">Invalid access token</string>
-    <string name="IgnoreBlocked">Ignore blocked users in group</string>
+    <string name="IgnoreBlocked">Hide messages from blocked user</string>
     <string name="Connection">Connection</string>
     <string name="Chat">Chat</string>
     <string name="NameOrder">Name order</string>
@@ -84,7 +84,7 @@
     <string name="Categories">Categories</string>
     <string name="OfficialChannel">Official channel</string>
     <string name="About">About</string>
-    <string name="IgnoreBlockedAbout">You\'ll no longer see messages from blocked users in groups.</string>
+    <string name="IgnoreBlockedAbout">IT IS NOT REALLY HIDE! Messages are still available to view, but text will be converted to Spoiler and media won\'t auto download.</string>
     <string name="Donate">Donate</string>
     <string name="DonateAbout">Support our development.</string>
     <string name="TranslationAbout">Help us to translate Nekogram to your language.</string>
@@ -164,7 +164,6 @@
     <string name="ApplyEmojiFont">Apply emoji font</string>
     <string name="DisableJumpToNextChannel">Disable \"Jump to Next Channel\"</string>
     <string name="DisableGreetingSticker">Disable greeting sticker</string>
-    <string name="BlockSponsoredMessage">Block sponsored message</string>
     <string name="DeleteAllFromSelfAdmin">With admin rights</string>
     <string name="OfficialSite">Official site</string>
     <string name="MutualContact">Mutual contact</string>
@@ -194,6 +193,14 @@
     <string name="SaveToDownloadCount_other">Saving %1$d files to downloads</string>
     <string name="ThemesChannel">Themes channel</string>
     <string name="SelectAnIcon">Choose an icon</string>
+    <string name="AppLinkNotVerifiedMessage">For Android 12 and newer, you need to manually add link to verified links in order to open t.me links in Nekogram.</string>
+    <string name="AppLinkNotVerifiedTitle">App links not verified</string>
+    <string name="AutoTranslate">Auto translate</string>
+    <string name="AutoTranslateAbout">Automatically translate messages that are in another language.</string>
+    <string name="CodeSyntaxHighlight">Code syntax highlight</string>
+    <string name="CreateMono">Create Monospace</string>
+    <string name="CreateMonoLanguage">Code language</string>
+    <string name="DoubleTapAction">Double tap action</string>
 
     <!-- Accessibility -->
     <string name="AccessibilitySettings">Accessibility settings</string>

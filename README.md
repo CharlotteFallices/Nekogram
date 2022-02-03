@@ -2,6 +2,8 @@
 ![Logo](https://github.com/CharlotteFallices/Nekogram/blob/master/TMessagesProj/src/main/res/mipmap-xxxhdpi/ic_launcher.png?raw=true)  
 Nekogram是一只非官方的Telegram客户端,**Nekogram不是[NekoX](https://github.com/NekoX-Dev/NekoX)**,它们来自于不同的几位开发者.
 
+**这个项目正在被重写,因此可能在一段时间内不会添加新功能或修复已有bug**
+
 ## 下载
 您可以在[Google Play Store](https://play.google.com/store/apps/details?id=tw.nekomimi.nekogram)或[官方群组](https://t.me/NekogramAPKs)中获取应用.
 您可以通过[这里](https://t.me/zuragram)获取更新消息,并在[这里](https://gitlab.com/Nekogram/Nekogram/-/issues)向我们反馈您的意见.

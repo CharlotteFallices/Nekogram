@@ -2,10 +2,14 @@ package tw.nekomimi.nekogram;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.graphics.Typeface;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Environment;
 import android.text.TextUtils;
 
@@ -26,6 +30,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.net.ServerSocket;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -49,11 +54,18 @@ public class NekoConfig {
     public static final int TRANS_TYPE_TG = 1;
     public static final int TRANS_TYPE_EXTERNAL = 2;
 
+    public static final int DOUBLE_TAP_ACTION_NONE = 0;
+    public static final int DOUBLE_TAP_ACTION_REACTION = 1;
+    public static final int DOUBLE_TAP_ACTION_TRANSLATE = 2;
+    public static final int DOUBLE_TAP_ACTION_REPLY = 3;
+    public static final int DOUBLE_TAP_ACTION_SAVE = 4;
+    public static final int DOUBLE_TAP_ACTION_REPEAT = 5;
+
     private static final String EMOJI_FONT_AOSP = "NotoColorEmoji.ttf";
 
     private static final Object sync = new Object();
     public static boolean useIPv6 = false;
-    public static boolean showHiddenFeature = false;
+    public static boolean showHiddenFeature = BuildConfig.DEBUG;
 
     public static boolean useSystemEmoji = SharedConfig.useSystemEmoji;
     public static boolean ignoreBlocked = false;
@@ -67,6 +79,8 @@ public class NekoConfig {
     public static boolean askBeforeCall = true;
     public static boolean disableNumberRounding = false;
     public static boolean disableGreetingSticker = false;
+    public static boolean autoTranslate = false;
+    public static boolean codeSyntaxHighlight = false;
     public static float stickerSize = 14.0f;
     public static int translationProvider = Translator.PROVIDER_GOOGLE;
     public static String translationTarget = "app";
@@ -75,6 +89,8 @@ public class NekoConfig {
     public static int idType = ID_TYPE_API;
     public static int maxRecentStickers = 20;
     public static int transType = TRANS_TYPE_NEKO;
+    public static int doubleTapAction = DOUBLE_TAP_ACTION_REACTION;
+    public static HashSet<String> restrictedLanguages = new HashSet<>();
 
     public static boolean showAddToSavedMessages = true;
     public static boolean showReport = false;
@@ -116,7 +132,6 @@ public class NekoConfig {
     public static boolean silenceNonContacts = false;
     public static boolean swipeToPiP = false;
     public static boolean disableJumpToNextChannel = false;
-    public static boolean useExternalTranslator = false;
     public static boolean disableVoiceMessageAutoPlay = false;
 
     public static final String WS_ADDRESS = "ws.neko";
@@ -127,10 +142,11 @@ public class NekoConfig {
     public static boolean wsUseMTP = false;
     public static boolean wsUseDoH = true;
 
+    public static boolean verifyLinkTip = false;
+
     public static boolean residentNotification = false;
 
     public static boolean shouldNOTTrustMe = false;
-    public static boolean blockSponsoredMessage = false;
 
     public static boolean customEmojiFont;
     public static String customEmojiFontPath;
@@ -141,6 +157,7 @@ public class NekoConfig {
     public static ArrayList<TLRPC.Update> pendingChangelog;
 
     public static boolean isChineseUser = false;
+    public static boolean installedFromPlay = false;
 
     private static boolean configLoaded;
 
@@ -195,11 +212,33 @@ public class NekoConfig {
         }
     }
 
+    private static void determineInstalledFromPlay() {
+        Context context = ApplicationLoader.applicationContext;
+        ApplicationInfo applicationInfo;
+        try {
+            applicationInfo = context.getPackageManager().getApplicationInfo(context.getPackageName(), PackageManager.GET_META_DATA);
+        } catch (Exception e) {
+            installedFromPlay = true;
+            return;
+        }
+        if (applicationInfo == null) {
+            installedFromPlay = true;
+            return;
+        }
+        Bundle meta = applicationInfo.metaData;
+        if (meta == null || !meta.containsKey("tw.nekomimi.nekogram.referer")) {
+            installedFromPlay = true;
+            return;
+        }
+        installedFromPlay = meta.getString("tw.nekomimi.nekogram.referer").equals("nekogram.bundle");
+    }
+
     public static void loadConfig() {
         synchronized (sync) {
             if (configLoaded) {
                 return;
             }
+            determineInstalledFromPlay();
             isChineseUser = ApplicationLoader.applicationContext.getResources().getBoolean(R.bool.isChineseUser);
 
             SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
@@ -230,7 +269,7 @@ public class NekoConfig {
             translationProvider = preferences.getInt("translationProvider", isChineseUser ? Translator.PROVIDER_LINGO : Translator.PROVIDER_GOOGLE);
             disablePhotoSideAction = preferences.getBoolean("disablePhotoSideAction", true);
             openArchiveOnPull = preferences.getBoolean("openArchiveOnPull", false);
-            showHiddenFeature = preferences.getBoolean("showHiddenFeature5", false);
+            showHiddenFeature = preferences.getBoolean("showHiddenFeature5", BuildConfig.DEBUG);
             hideKeyboardOnChatScroll = preferences.getBoolean("hideKeyboardOnChatScroll", false);
             avatarAsDrawerBackground = preferences.getBoolean("avatarAsDrawerBackground", false);
             avatarBackgroundBlur = preferences.getBoolean("avatarBackgroundBlur", false);
@@ -268,17 +307,43 @@ public class NekoConfig {
             maxRecentStickers = preferences.getInt("maxRecentStickers", 20);
             disableJumpToNextChannel = preferences.getBoolean("disableJumpToNextChannel", false);
             disableGreetingSticker = preferences.getBoolean("disableGreetingSticker", false);
-            blockSponsoredMessage = preferences.getBoolean("blockSponsoredMessage", false);
-            useExternalTranslator = preferences.getBoolean("useExternalTranslator", false);
+            autoTranslate = preferences.getBoolean("autoTranslate", false);
             disableVoiceMessageAutoPlay = preferences.getBoolean("disableVoiceMessageAutoPlay", false);
             transType = preferences.getInt("transType", TRANS_TYPE_NEKO);
             showCopyPhoto = preferences.getBoolean("showCopyPhoto", false);
+            verifyLinkTip = preferences.getBoolean("verifyLinkTip", false);
+            codeSyntaxHighlight = preferences.getBoolean("codeSyntaxHighlight", false);
+            doubleTapAction = preferences.getInt("doubleTapAction", DOUBLE_TAP_ACTION_REACTION);
+            restrictedLanguages = new HashSet<>(preferences.getStringSet("restrictedLanguages", new HashSet<>()));
             configLoaded = true;
         }
     }
 
     public static boolean isChatCat(TLRPC.Chat chat) {
         return ConfigHelper.getVerify().stream().anyMatch(id -> id == chat.id);
+    }
+
+    public static void saveRestrictedLanguages() {
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.putStringSet("restrictedLanguages", restrictedLanguages);
+        editor.commit();
+    }
+
+    public static void setDoubleTapAction(int action) {
+        doubleTapAction = action;
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.putInt("doubleTapAction", doubleTapAction);
+        editor.commit();
+    }
+
+    public static void setVerifyLinkTip(boolean shown) {
+        verifyLinkTip = shown;
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.putBoolean("verifyLinkTip", verifyLinkTip);
+        editor.commit();
     }
 
     public static void setTransType(int type) {
@@ -294,6 +359,14 @@ public class NekoConfig {
         SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
         SharedPreferences.Editor editor = preferences.edit();
         editor.putBoolean("wsUseMTP", wsUseMTP);
+        editor.commit();
+    }
+
+    public static void toggleCodeSyntaxHighlight() {
+        codeSyntaxHighlight = !codeSyntaxHighlight;
+        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
+        SharedPreferences.Editor editor = preferences.edit();
+        editor.putBoolean("codeSyntaxHighlight", codeSyntaxHighlight);
         editor.commit();
     }
 
@@ -788,19 +861,11 @@ public class NekoConfig {
         editor.commit();
     }
 
-    public static void toggleBlockSponsoredMessage() {
-        blockSponsoredMessage = !blockSponsoredMessage;
+    public static void toggleAutoTranslate() {
+        autoTranslate = !autoTranslate;
         SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
         SharedPreferences.Editor editor = preferences.edit();
-        editor.putBoolean("blockSponsoredMessage", blockSponsoredMessage);
-        editor.commit();
-    }
-
-    public static void toggleUseExternalTranslator() {
-        useExternalTranslator = !useExternalTranslator;
-        SharedPreferences preferences = ApplicationLoader.applicationContext.getSharedPreferences("nekoconfig", Activity.MODE_PRIVATE);
-        SharedPreferences.Editor editor = preferences.edit();
-        editor.putBoolean("useExternalTranslator", useExternalTranslator);
+        editor.putBoolean("autoTranslate", autoTranslate);
         editor.commit();
     }
 

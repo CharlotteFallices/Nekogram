@@ -9,3 +9,4 @@ local.properties
 afat
 arm64
 *.DS_Store
+.markeditor

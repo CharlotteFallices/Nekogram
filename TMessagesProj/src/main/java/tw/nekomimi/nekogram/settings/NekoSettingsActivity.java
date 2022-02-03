@@ -5,7 +5,6 @@ import android.app.assist.AssistContent;
 import android.content.Context;
 import android.net.Uri;
 import android.os.Build;
-import android.view.HapticFeedbackConstants;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.accessibility.AccessibilityManager;
@@ -38,7 +37,6 @@ import org.telegram.ui.Cells.TextDetailSettingsCell;
 import org.telegram.ui.Cells.TextInfoPrivacyCell;
 import org.telegram.ui.Cells.TextSettingsCell;
 import org.telegram.ui.Components.AlertsCreator;
-import org.telegram.ui.Components.EmbedBottomSheet;
 import org.telegram.ui.Components.LayoutHelper;
 import org.telegram.ui.Components.RecyclerListView;
 import org.telegram.ui.LaunchActivity;
@@ -75,6 +73,7 @@ public class NekoSettingsActivity extends BaseFragment implements NotificationCe
     private int websiteRow;
     private int sourceCodeRow;
     private int translationRow;
+    private int donateRow;
     private int checkUpdateRow;
     private int about2Row;
 
@@ -146,6 +145,8 @@ public class NekoSettingsActivity extends BaseFragment implements NotificationCe
                 presentFragment(new AccessibilitySettingsActivity());
             } else if (position == channelRow) {
                 getMessagesController().openByUserName(LocaleController.getString("OfficialChannelUsername", R.string.OfficialChannelUsername), this, 1);
+            } else if (position == donateRow) {
+                presentFragment(new NekoDonateActivity());
             } else if (position == translationRow) {
                 Browser.openUrl(getParentActivity(), "https://neko.crowdin.com/nekogram");
             } else if (position == websiteRow) {
@@ -159,27 +160,6 @@ public class NekoSettingsActivity extends BaseFragment implements NotificationCe
             } else if (position >= sponsorRow && position < sponsor2Row) {
                 ConfigHelper.NewsItem item = news.get(position - sponsorRow);
                 Browser.openUrl(getParentActivity(), item.url);
-            }
-        });
-        listView.setOnItemLongClickListener(new RecyclerListView.OnItemLongClickListener() {
-
-            private int pressCount = 0;
-
-            @Override
-            public boolean onItemClick(View view, int position) {
-                if (position == experimentRow) {
-                    pressCount++;
-                    if (pressCount >= 2) {
-                        NekoConfig.toggleShowHiddenFeature();
-                        view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP, HapticFeedbackConstants.FLAG_IGNORE_GLOBAL_SETTING);
-                        if (NekoConfig.showHiddenFeature) {
-                            AndroidUtilities.shakeView(view, 2, 0);
-                        }
-                        EmbedBottomSheet.show(getParentActivity(), null, null, NekoConfig.isChineseUser ? "BiliBili" : "YouTube", "Nekogram Secrets", "https://www.youtube.com/watch?v=dQw4w9WgXcQ", "https://www.youtube.com/embed/dQw4w9WgXcQ", 1280, 720, 0, false);
-                        return true;
-                    }
-                }
-                return false;
             }
         });
 
@@ -214,7 +194,8 @@ public class NekoSettingsActivity extends BaseFragment implements NotificationCe
         websiteRow = rowCount++;
         sourceCodeRow = rowCount++;
         translationRow = rowCount++;
-        checkUpdateRow = rowCount++;
+        donateRow = rowCount++;
+        checkUpdateRow = !NekoConfig.installedFromPlay ? rowCount++ : -1;
         about2Row = rowCount++;
 
         if (news.size() != 0) {
@@ -349,6 +330,8 @@ public class NekoSettingsActivity extends BaseFragment implements NotificationCe
                     textCell.setMultilineDetail(true);
                     if (position == translationRow) {
                         textCell.setTextAndValue(LocaleController.getString("Translation", R.string.Translation), LocaleController.getString("TranslationAbout", R.string.TranslationAbout), true);
+                    } else if (position == donateRow) {
+                        textCell.setTextAndValue(LocaleController.getString("Donate", R.string.Donate), LocaleController.getString("DonateAbout", R.string.DonateAbout), position + 1 != about2Row);
                     } else if (position == checkUpdateRow) {
                         textCell.setTextAndValue(LocaleController.getString("CheckUpdate", R.string.CheckUpdate),
                                 checkingUpdate ? LocaleController.getString("CheckingUpdate", R.string.CheckingUpdate) :

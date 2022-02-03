@@ -4,6 +4,7 @@ import android.annotation.SuppressLint;
 import android.os.AsyncTask;
 
 import androidx.annotation.Nullable;
+import androidx.collection.LruCache;
 
 import org.telegram.messenger.FileLog;
 import org.telegram.messenger.LocaleController;
@@ -24,6 +25,8 @@ import tw.nekomimi.nekogram.NekoConfig;
 
 abstract public class BaseTranslator {
 
+    private final LruCache<Object, Result> cache = new LruCache<>(200);
+
     abstract protected Result translate(String query, String tl) throws Exception;
 
     abstract public List<String> getTargetLanguages();
@@ -33,7 +36,12 @@ abstract public class BaseTranslator {
     }
 
     void startTask(Object query, String toLang, Translator.TranslateCallBack translateCallBack) {
-        new MyAsyncTask().request(query, toLang, translateCallBack).execute();
+        var result = cache.get(query);
+        if (result != null) {
+            translateCallBack.onSuccess(result.translation, result.sourceLanguage);
+        } else {
+            new MyAsyncTask().request(query, toLang, translateCallBack).execute();
+        }
     }
 
     public boolean supportLanguage(String language) {
@@ -124,6 +132,7 @@ abstract public class BaseTranslator {
             } else {
                 Result translationResult = (Result) result;
                 translateCallBack.onSuccess(translationResult.translation, translationResult.sourceLanguage);
+                cache.put(query, translationResult);
             }
         }
 
@@ -159,16 +168,25 @@ abstract public class BaseTranslator {
 
         public String request() throws IOException {
             httpURLConnection.connect();
+            if (httpURLConnection.getResponseCode() == 429) {
+                throw new Http429Exception();
+            }
             InputStream stream;
             if (httpURLConnection.getResponseCode() < HttpURLConnection.HTTP_BAD_REQUEST) {
                 stream = httpURLConnection.getInputStream();
             } else {
                 stream = httpURLConnection.getErrorStream();
             }
-            return new Scanner(stream, "UTF-8")
+            String response = new Scanner(stream, "UTF-8")
                     .useDelimiter("\\A")
                     .next();
+            stream.close();
+            return response;
         }
+    }
+
+    public static class Http429Exception extends IOException {
+
     }
 
     public static class Result {

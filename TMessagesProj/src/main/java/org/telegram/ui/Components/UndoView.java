@@ -12,6 +12,7 @@ import android.graphics.PorterDuffColorFilter;
 import android.graphics.RectF;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.os.SystemClock;
 import android.text.Layout;
 import android.text.Selection;
@@ -948,6 +949,9 @@ public class UndoView extends FrameLayout {
                 timeLeft = 3000;
                 infoTextView.setTextSize(TypedValue.COMPLEX_UNIT_DIP, 15);
             } else if (currentAction == ACTION_MESSAGE_COPIED || currentAction == ACTION_USERNAME_COPIED || currentAction == ACTION_HASHTAG_COPIED || currentAction == ACTION_TEXT_COPIED || currentAction == ACTION_LINK_COPIED || currentAction == ACTION_PHONE_COPIED || currentAction == ACTION_EMAIL_COPIED) {
+                //if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                //    return;
+                //}
                 int iconRawId = R.raw.copy;
                 if (currentAction == ACTION_EMAIL_COPIED) {
                     infoTextView.setText(LocaleController.getString("EmailCopied", R.string.EmailCopied));

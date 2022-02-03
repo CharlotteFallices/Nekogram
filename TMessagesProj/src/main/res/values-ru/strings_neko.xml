@@ -9,7 +9,7 @@
     <string name="DeleteAllFromSelfAlert">Внимание! Это **удалит все ваши сообщения** в этом чате для **всех**.</string>
     <string name="BotLogin">Вход по токену</string>
     <string name="InvalidAccessToken">Токен недействителен</string>
-    <string name="IgnoreBlocked">Игнорировать заблокированных пользователей в группе</string>
+    <string name="IgnoreBlocked">Скрывать сообщения от заблокированных пользователей</string>
     <string name="Connection">Соединение</string>
     <string name="Chat">Чат</string>
     <string name="NameOrder">Сортировка имён</string>
@@ -20,7 +20,7 @@
     <string name="AddToSavedMessages">Сохранить сообщение</string>
     <string name="CreateMention">Создать упоминание</string>
     <string name="ForceTabletMode">Принудительный режим планшета</string>
-    <string name="Prpr">Peropero</string>
+    <string name="Prpr">Peropero (помурчать кому-то)</string>
     <string name="TransparentStatusBar">Прозрачная строка уведомлений</string>
     <string name="EnableResidentNotification">Включить постоянное уведомление</string>
     <string name="DisableResidentNotification">Отключить постоянное уведомление</string>
@@ -69,19 +69,19 @@
     <string name="TabTitleType">Показывать на вкладках</string>
     <string name="TabTitleTypeTip">Эмодзи синхронизируются в облаке Telegram.</string>
     <string name="TabTitleTypeText">Названия</string>
-    <string name="TabTitleTypeIcon">Емодзи</string>
-    <string name="TabTitleTypeMix">Названня и емодзи</string>
+    <string name="TabTitleTypeIcon">Эмодзи</string>
+    <string name="TabTitleTypeMix">Названия и эмодзи</string>
     <string name="ConfirmAVMessage">Подтверждение аудио/видео сообщений</string>
     <string name="AskBeforeCalling">Подтверждать звонки</string>
     <string name="DisableNumberRounding">Не округлять числа</string>
     <string name="Categories">Настройки</string>
     <string name="OfficialChannel">Официальный канал</string>
     <string name="About">О проекте</string>
-    <string name="IgnoreBlockedAbout">Вы больше не увидите сообщения от заблокированных пользователей в группах.</string>
+    <string name="IgnoreBlockedAbout">НА САМОМ ДЕЛЕ ЭТО НЕ СКРЫТИЕ! Сообщения по-прежнему доступны для просмотра, но текст будет преобразован в спойлер, а медиафайлы не будут загружаться автоматически.</string>
     <string name="Donate">Поддержать Nekogram</string>
     <string name="DonateAbout">Поддержите разработку проекта.</string>
     <string name="TranslationAbout">Помогите перевести Nekogram на ваш язык.</string>
-    <string name="Translation">Перевести Nekogram</string>
+    <string name="Translation">Помочь перевести Neko</string>
     <string name="GooglePlay">Google Play</string>
     <string name="ResetStickerSize">Сбросить размер стикера</string>
     <string name="OfficialChannelUsername">nekoupdates</string>
@@ -133,7 +133,7 @@
     <string name="WsEnableTls">Включить TLS</string>
     <string name="WsLocalProxy">Локальный прокси</string>
     <string name="WsEnableDoh">Включить DoH</string>
-    <string name="UpdateNekogram">Обнови меня ~ Nekogram</string>
+    <string name="UpdateNekogram">Обнови меня ~</string>
     <string name="TranslationTarget">Целевой язык</string>
     <string name="TranslationTargetApp">Системный</string>
     <string name="Translator">Переводчик</string>
@@ -156,7 +156,6 @@
     <string name="ApplyEmojiFont">Включить шрифт эмодзи</string>
     <string name="DisableJumpToNextChannel">Выключить \"Перейти на следующий канал\"</string>
     <string name="DisableGreetingSticker">Отключить приветственный стикер</string>
-    <string name="BlockSponsoredMessage">Блокировка спонсируемого сообщения</string>
     <string name="DeleteAllFromSelfAdmin">С правами администратора</string>
     <string name="OfficialSite">Официальный сайт</string>
     <string name="MutualContact">Общий контакт</string>
@@ -184,6 +183,16 @@
     <string name="SaveToDownloadCount_few">Сохранение %1$d файлов в загрузки</string>
     <string name="SaveToDownloadCount_many">Сохранение %1$d файлов в загрузки</string>
     <string name="SaveToDownloadCount_other">Сохранение %1$d файлов в загрузки</string>
+    <string name="ThemesChannel">Канал тем</string>
+    <string name="SelectAnIcon">Выберите иконку</string>
+    <string name="AppLinkNotVerifiedMessage">Для Android 12 и более поздних версий вам необходимо вручную добавить ссылку к подтвержденным ссылкам, чтобы открывать ссылки t.me в Nekogram.</string>
+    <string name="AppLinkNotVerifiedTitle">Ссылки приложения не подтверждены</string>
+    <string name="AutoTranslate">Автоперевод</string>
+    <string name="AutoTranslateAbout">Автоматический перевод сообщений на другом языке.</string>
+    <string name="CodeSyntaxHighlight">Подсветка синтаксиса кода</string>
+    <string name="CreateMono">Создать моноширинный</string>
+    <string name="CreateMonoLanguage">Язык кода</string>
+    <string name="DoubleTapAction">Действие при двойном нажатии</string>
     <!-- Accessibility -->
     <string name="AccessibilitySettings">Специальные возможности</string>
     <string name="AccRewindHeading">Настройки перемотки</string>

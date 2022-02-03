@@ -17,6 +17,7 @@ import android.app.Activity;
 import android.content.ContentResolver;
 import android.content.ContentUris;
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
@@ -39,7 +40,6 @@ import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
-import android.media.MediaScannerConnection;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Environment;
@@ -65,7 +65,6 @@ import android.text.util.Linkify;
 import android.util.DisplayMetrics;
 import android.util.StateSet;
 import android.util.TypedValue;
-import android.view.ContextThemeWrapper;
 import android.view.Display;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -96,7 +95,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import androidx.viewpager.widget.ViewPager;
 
 import com.android.internal.telephony.ITelephony;
-import com.google.android.exoplayer2.util.Log;
 import com.google.android.gms.auth.api.phone.SmsRetriever;
 import com.google.android.gms.auth.api.phone.SmsRetrieverClient;
 import com.google.android.gms.tasks.Task;
@@ -148,6 +146,7 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Hashtable;
 import java.util.List;
@@ -192,6 +191,7 @@ public class AndroidUtilities {
     private static RectF bitmapRect;
 
     public static final RectF rectTmp = new RectF();
+    public static final Rect rectTmp2 = new Rect();
 
     public static Pattern WEB_URL = null;
     public static Pattern BAD_CHARS_PATTERN = null;
@@ -384,8 +384,8 @@ public class AndroidUtilities {
         if (context instanceof Activity) {
             return (Activity) context;
         }
-        if (context instanceof ContextThemeWrapper) {
-            return findActivity(((ContextThemeWrapper) context).getBaseContext());
+        if (context instanceof ContextWrapper) {
+            return findActivity(((ContextWrapper) context).getBaseContext());
         }
         return null;
     }
@@ -3645,6 +3645,41 @@ public class AndroidUtilities {
 
             }
             flagSecureFragment = null;
+        }
+    }
+
+    private static final HashMap<Window, ArrayList<Long>> flagSecureReasons = new HashMap<>();
+    // Sets FLAG_SECURE to true, until it gets unregistered (when returned callback is run)
+    // Useful for having multiple reasons to have this flag on.
+    public static Runnable registerFlagSecure(Window window) {
+        final long reasonId = (long) (Math.random() * 999999999);
+        final ArrayList<Long> reasonIds;
+        if (flagSecureReasons.containsKey(window)) {
+            reasonIds = flagSecureReasons.get(window);
+        } else {
+            reasonIds = new ArrayList<>();
+            flagSecureReasons.put(window, reasonIds);
+        }
+        reasonIds.add(reasonId);
+        updateFlagSecure(window);
+        return () -> {
+            reasonIds.remove(reasonId);
+            updateFlagSecure(window);
+        };
+    }
+    private static void updateFlagSecure(Window window) {
+        if (Build.VERSION.SDK_INT >= 23) {
+            if (window == null) {
+                return;
+            }
+            final boolean value = flagSecureReasons.containsKey(window) && flagSecureReasons.get(window).size() > 0;
+            try {
+                if (value) {
+                    window.setFlags(WindowManager.LayoutParams.FLAG_SECURE, WindowManager.LayoutParams.FLAG_SECURE);
+                } else {
+                    window.clearFlags(WindowManager.LayoutParams.FLAG_SECURE);
+                }
+            } catch (Exception ignore) {}
         }
     }
 

@@ -75,6 +75,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import tw.nekomimi.nekogram.NekoConfig;
+import tw.nekomimi.nekogram.helpers.MessageHelper;
 
 @SuppressWarnings("unchecked")
 public class MediaDataController extends BaseController {
@@ -311,7 +312,7 @@ public class MediaDataController extends BaseController {
                         date = c.intValue(2);
                     }
                 } catch (Exception e) {
-                    FileLog.e(e);
+                    FileLog.e(e, false);
                 } finally {
                     if (c != null) {
                         c.dispose();
@@ -360,6 +361,14 @@ public class MediaDataController extends BaseController {
 
                     imageReceiver = new ImageReceiver();
                     imageReceiver.setImage(ImageLocation.getForDocument(reaction.appear_animation), "60_60_nolimit", null, null, 0, 1);
+                    ImageLoader.getInstance().loadImageForImageReceiver(imageReceiver);
+
+                    imageReceiver = new ImageReceiver();
+                    imageReceiver.setImage(ImageLocation.getForDocument(reaction.around_animation), null, null, null, 0, 1);
+                    ImageLoader.getInstance().loadImageForImageReceiver(imageReceiver);
+
+                    imageReceiver = new ImageReceiver();
+                    imageReceiver.setImage(ImageLocation.getForDocument(reaction.center_icon), null, null, null, 0, 1);
                     ImageLoader.getInstance().loadImageForImageReceiver(imageReceiver);
 
                     imageReceiver = new ImageReceiver();
@@ -2727,7 +2736,7 @@ public class MediaDataController extends BaseController {
             }
             if (isVoice) {
                 return MEDIA_AUDIO;
-            } else if (isVideo && !isAnimated) {
+            } else if (isVideo && !isAnimated && !isSticker) {
                 return MEDIA_PHOTOVIDEO;
             } else if (isSticker) {
                 return -1;
@@ -4600,7 +4609,7 @@ public class MediaDataController extends BaseController {
     }
 
     public static void addTextStyleRuns(MessageObject msg, Spannable text) {
-        addTextStyleRuns(msg.messageOwner.entities, msg.messageText, text, -1);
+        addTextStyleRuns(msg, msg.messageText, text, -1);
     }
 
     public static void addTextStyleRuns(TLRPC.DraftMessage msg, Spannable text, int allowedFlags) {
@@ -4608,11 +4617,15 @@ public class MediaDataController extends BaseController {
     }
 
     public static void addTextStyleRuns(MessageObject msg, Spannable text, int allowedFlags) {
-        addTextStyleRuns(msg.messageOwner.entities, msg.messageText, text, allowedFlags);
+        addTextStyleRuns(msg, msg.messageText, text, allowedFlags);
     }
 
-    public static void addTextStyleRuns(ArrayList<TLRPC.MessageEntity> entities, CharSequence messageText, Spannable text) {
-        addTextStyleRuns(entities, messageText, text, -1);
+    public static void addTextStyleRuns(MessageObject message, CharSequence messageText, Spannable text) {
+        addTextStyleRuns(message, messageText, text, -1);
+    }
+
+    public static void addTextStyleRuns(MessageObject message, CharSequence messageText, Spannable text, int allowedFlags) {
+        addTextStyleRuns(MessageHelper.checkBlockedUserEntities(message), messageText, text, allowedFlags);
     }
 
     public static void addTextStyleRuns(ArrayList<TLRPC.MessageEntity> entities, CharSequence messageText, Spannable text, int allowedFlags) {
@@ -4741,15 +4754,21 @@ public class MediaDataController extends BaseController {
         return runs;
     }
 
-    public void addStyle(int flags, int spanStart, int spanEnd, ArrayList<TLRPC.MessageEntity> entities) {
+    public void addStyle(TextStyleSpan.TextStyleRun styleRun, int spanStart, int spanEnd, ArrayList<TLRPC.MessageEntity> entities) {
+        int flags = styleRun.flags;
         if ((flags & TextStyleSpan.FLAG_STYLE_SPOILER) != 0)
             entities.add(setEntityStartEnd(new TLRPC.TL_messageEntitySpoiler(), spanStart, spanEnd));
         if ((flags & TextStyleSpan.FLAG_STYLE_BOLD) != 0)
             entities.add(setEntityStartEnd(new TLRPC.TL_messageEntityBold(), spanStart, spanEnd));
         if ((flags & TextStyleSpan.FLAG_STYLE_ITALIC) != 0)
             entities.add(setEntityStartEnd(new TLRPC.TL_messageEntityItalic(), spanStart, spanEnd));
-        if ((flags & TextStyleSpan.FLAG_STYLE_MONO) != 0)
-            entities.add(setEntityStartEnd(new TLRPC.TL_messageEntityCode(), spanStart, spanEnd));
+        if ((flags & TextStyleSpan.FLAG_STYLE_MONO) != 0) {
+            if (styleRun.urlEntity != null) {
+                entities.add(setEntityStartEnd(styleRun.urlEntity, spanStart, spanEnd));
+            } else {
+                entities.add(setEntityStartEnd(new TLRPC.TL_messageEntityCode(), spanStart, spanEnd));
+            }
+        }
         if ((flags & TextStyleSpan.FLAG_STYLE_STRIKE) != 0)
             entities.add(setEntityStartEnd(new TLRPC.TL_messageEntityStrike(), spanStart, spanEnd));
         if ((flags & TextStyleSpan.FLAG_STYLE_UNDERLINE) != 0)
@@ -4855,7 +4874,7 @@ public class MediaDataController extends BaseController {
                     if (entities == null) {
                         entities = new ArrayList<>();
                     }
-                    addStyle(span.getStyleFlags(), spanStart, spanEnd, entities);
+                    addStyle(span.getTextStyleRun(), spanStart, spanEnd, entities);
                 }
             }
 
@@ -4891,7 +4910,7 @@ public class MediaDataController extends BaseController {
                     entities.add(entity);
                     TextStyleSpan.TextStyleRun style = spansUrlReplacement[b].getTextStyleRun();
                     if (style != null) {
-                        addStyle(style.flags, entity.offset, entity.offset + entity.length, entities);
+                        addStyle(style, entity.offset, entity.offset + entity.length, entities);
                     }
                 }
             }
@@ -5466,8 +5485,6 @@ public class MediaDataController extends BaseController {
             if (savedReaction != null && getReactionsMap().get(savedReaction) != null) {
                 doubleTapReaction = savedReaction;
                 return doubleTapReaction;
-            } else if ("disabled".equals(savedReaction)) {
-                return savedReaction;
             }
             return getReactionsList().get(0).reaction;
         }
